@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mantashani & Rici Melion — Stock Pro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#F4F4F4;color:#111;min-height:100vh}
+.login-screen{position:fixed;inset:0;background:#8B0000;display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-box{background:#fff;border-radius:12px;padding:36px;width:100%;max-width:380px;border-top:4px solid #C9A84C}
+.login-logo h1{font-size:20px;font-weight:700;color:#8B0000;letter-spacing:0.08em;text-align:center}
+.login-logo p{font-size:10px;color:#888;letter-spacing:0.12em;text-align:center;margin-top:3px}
+.gold-line{width:40px;height:2px;background:#C9A84C;margin:12px auto 20px}
+.lf label{display:block;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666;margin-bottom:5px}
+.lf input{width:100%;padding:10px 14px;font-size:13px;border:1px solid #DDD;border-radius:6px;background:#FAFAFA;outline:none;margin-bottom:12px}
+.lf input:focus{border-color:#8B0000;background:#fff}
+.login-btn{width:100%;padding:12px;background:#8B0000;color:#fff;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;border:none;border-radius:6px;cursor:pointer}
+.login-btn:hover{background:#5C0000}
+.login-hint{margin-top:14px;padding:10px;background:#FFF9F0;border-radius:6px;font-size:11px;color:#666;border:1px solid #EEE}
+.login-err{background:#FADBD8;color:#A32D2D;padding:10px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none;text-align:center}
+.app{display:none}
+.header{background:#8B0000;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;border-bottom:3px solid #C9A84C}
+.header h1{font-size:14px;font-weight:600;letter-spacing:0.06em;color:#fff}
+.header-sub{font-size:10px;color:rgba(255,255,255,0.5);margin-top:1px}
+.hright{display:flex;align-items:center;gap:10px}
+.ubadge{font-size:11px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);padding:4px 12px;border-radius:20px}
+.lbtn{padding:6px 14px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;border-radius:6px;cursor:pointer}
+.main{max-width:1400px;margin:0 auto;padding:20px 16px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+.stat{background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:12px;text-align:center;border-top:3px solid #8B0000}
+.stat-num{font-size:22px;font-weight:700;color:#8B0000}
+.stat-lbl{font-size:9px;color:#888;letter-spacing:0.08em;text-transform:uppercase;margin-top:2px}
+.tabs{display:flex;gap:0;border-bottom:2px solid #E0E0E0;margin-bottom:20px;flex-wrap:wrap;background:#fff}
+.tab{padding:10px 18px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;border:none;background:transparent;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab.active{color:#8B0000;border-bottom-color:#8B0000}
+.page{display:none}.page.active{display:block}
+.card{background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:18px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:600;color:#111;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #F0F0F0;display:flex;justify-content:space-between;align-items:center}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.fr label{display:block;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666;margin-bottom:4px}
+.fr input,.fr select,.fr textarea{width:100%;padding:8px 11px;font-size:12px;border:1px solid #DDD;border-radius:6px;background:#FAFAFA;color:#111;outline:none}
+.fr input:focus,.fr select:focus{border-color:#8B0000;background:#fff}
+.btn{padding:8px 18px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;border-radius:6px;cursor:pointer;border:none;transition:all 0.2s}
+.btn-red{background:#8B0000;color:#fff}.btn-red:hover{background:#5C0000}
+.btn-green{background:#2D6A4F;color:#fff}.btn-green:hover{background:#1a4a36}
+.btn-blue{background:#185FA5;color:#fff}.btn-blue:hover{background:#0d4a8a}
+.btn-gold{background:#C9A84C;color:#fff}.btn-gold:hover{background:#a8893d}
+.btn-orange{background:#E67E22;color:#fff}.btn-orange:hover{background:#b96a1b}
+.btn-outline{background:#fff;border:1px solid #DDD;color:#666}.btn-outline:hover{border-color:#8B0000;color:#8B0000}
+.btn-danger{background:#FADBD8;color:#A32D2D;border:1px solid #F5C6CB}.btn-danger:hover{background:#A32D2D;color:#fff}
+.btn-sm{padding:4px 10px;font-size:10px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.b-in{background:#D5F5E3;color:#155724}
+.b-low{background:#FEF9E7;color:#854F0B}
+.b-out{background:#FADBD8;color:#A32D2D}
+.b-return{background:#E8DAEF;color:#6C3483}
+.b-open{background:#FEF9E7;color:#854F0B}
+.b-closed{background:#D5F5E3;color:#155724}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#888;padding:8px 10px;border-bottom:2px solid #F0F0F0;background:#FAFAFA;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #F5F5F5;vertical-align:middle}
+tr:hover td{background:#FFF9F9}
+.tw{overflow-x:auto}
+.alert{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:10px;display:none;font-weight:500}
+.alert.s{background:#D5F5E3;color:#155724;border:1px solid #2D6A4F}
+.alert.e{background:#FADBD8;color:#A32D2D;border:1px solid #8B0000}
+.alert.w{background:#FEF9E7;color:#854F0B;border:1px solid #C9A84C}
+.fbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;background:#F9F9F9;padding:12px;border-radius:8px;border:1px solid #EEE}
+.fbar label{font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#666;display:block;margin-bottom:3px}
+.fbar input,.fbar select{padding:6px 9px;font-size:12px;border:1px solid #DDD;border-radius:6px;background:#fff;outline:none}
+.sumbox{background:#8B0000;color:#fff;border-radius:8px;padding:14px;margin-bottom:14px}
+.sumbox h3{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:8px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
+.snum{font-size:20px;font-weight:700;color:#fff}
+.slbl{font-size:9px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.06em}
+/* ORDER SESSION */
+.session-box{background:linear-gradient(135deg,#FFF9F0,#FFF);border:2px solid #C9A84C;border-radius:10px;padding:18px;margin-bottom:16px}
+.session-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.session-title{font-size:14px;font-weight:600;color:#8B0000}
+.session-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:#FEF9E7;color:#854F0B}
+.session-badge.active{background:#D5F5E3;color:#155724}
+.scan-box{display:flex;gap:10px;margin-bottom:10px}
+.scan-input{flex:1;padding:12px 16px;font-size:18px;border:2px solid #8B0000;border-radius:8px;background:#fff;letter-spacing:0.12em;outline:none;font-weight:600}
+.scan-input:focus{border-color:#C9A84C;box-shadow:0 0 0 3px rgba(201,168,76,0.15)}
+.scanned-items{background:#F9F9F9;border-radius:8px;padding:12px;min-height:60px;margin-bottom:12px}
+.scanned-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fff;border:1px solid #EEE;border-radius:6px;margin-bottom:6px}
+.scanned-item:last-child{margin-bottom:0}
+/* AI CHAT */
+.ai-box{position:fixed;bottom:20px;right:20px;z-index:500}
+.ai-toggle{width:50px;height:50px;border-radius:50%;background:#8B0000;border:3px solid #C9A84C;color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.ai-panel{position:absolute;bottom:60px;right:0;width:320px;background:#fff;border-radius:12px;border:1px solid #E0E0E0;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:none;flex-direction:column;overflow:hidden}
+.ai-panel.open{display:flex}
+.ai-header{background:#8B0000;color:#fff;padding:12px 16px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.ai-messages{flex:1;overflow-y:auto;padding:12px;max-height:300px;min-height:150px}
+.ai-msg{margin-bottom:10px}
+.ai-msg.bot .bubble{background:#F0F0F0;color:#111;border-radius:0 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.5;max-width:85%}
+.ai-msg.user .bubble{background:#8B0000;color:#fff;border-radius:10px 0 10px 10px;padding:8px 12px;font-size:12px;line-height:1.5;max-width:85%;margin-left:auto}
+.ai-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid #F0F0F0}
+.ai-input{flex:1;padding:8px 12px;font-size:12px;border:1px solid #DDD;border-radius:6px;outline:none}
+.ai-send{padding:8px 14px;background:#8B0000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px;border-top:1px solid #F0F0F0}
+.ai-sug{padding:4px 10px;background:#F0F0F0;border:none;border-radius:20px;font-size:10px;cursor:pointer;color:#555}
+.ai-sug:hover{background:#8B0000;color:#fff}
+/* REPL REPORT */
+.repl-card{border:2px solid #E74C3C;border-radius:8px;padding:14px;background:#FFF9F9;margin-bottom:10px}
+.repl-card.ok{border-color:#2D6A4F;background:#F0FFF4}
+.repl-card.warn{border-color:#C9A84C;background:#FFF9F0}
+.brand-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-right:6px}
+.brand-m{background:#FADBD8;color:#8B0000}
+.brand-r{background:#D6EAF8;color:#185FA5}
+/* USER CARD */
+.ucard{background:#FAFAFA;border:1px solid #EEE;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.uavatar{width:34px;height:34px;border-radius:50%;background:#8B0000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.uid{font-size:13px;font-weight:600}.uun{font-size:11px;color:#888;margin-top:1px}
+.acc-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.acc-item{display:flex;align-items:center;gap:5px;padding:4px 10px;background:#fff;border:1px solid #EEE;border-radius:6px;font-size:11px}
+.acc-item input{width:14px;height:14px;cursor:pointer;accent-color:#8B0000}
+.oid{font-family:'Courier New',monospace;font-size:11px;font-weight:600;color:#8B0000}
+.price{font-weight:600;color:#2D6A4F}
+.empty{text-align:center;padding:24px;color:#AAA;font-size:12px}
+@media(max-width:700px){.stats{grid-template-columns:repeat(3,1fr)}.ai-panel{width:280px}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="ls">
+  <div class="login-box">
+    <div class="login-logo"><h1>MANTASHANI × RICI MELION</h1><p>STOCK MANAGEMENT SYSTEM PRO</p></div>
+    <div class="gold-line"></div>
+    <div class="login-err" id="lerr">❌ Invalid username or password</div>
+    <div class="lf">
+      <label>Username</label><input id="lu" placeholder="Enter username" onkeydown="if(event.key==='Enter')login()">
+      <label>Password</label><input id="lp" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="login-btn" onclick="login()">LOGIN</button>
+    <div class="login-hint"><b>Manager:</b> manager / manager123</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="header">
+    <div><h1>📦 MANTASHANI × RICI MELION — STOCK PRO</h1><div class="header-sub">Npire Group | Ecommerce Operations</div></div>
+    <div class="hright">
+      <div class="ubadge" id="ubadge"></div>
+      <div id="clock" style="font-size:10px;color:rgba(255,255,255,0.6)"></div>
+      <button class="lbtn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+  <div class="main">
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat"><div class="stat-num" id="st-p">0</div><div class="stat-lbl">Products</div></div>
+      <div class="stat"><div class="stat-num" id="st-s">0</div><div class="stat-lbl">Total Stock</div></div>
+      <div class="stat"><div class="stat-num" id="st-o">0</div><div class="stat-lbl">Total Out</div></div>
+      <div class="stat"><div class="stat-num" id="st-r">0</div><div class="stat-lbl">Returns</div></div>
+      <div class="stat"><div class="stat-num" id="st-t">0</div><div class="stat-lbl">Today Out</div></div>
+      <div class="stat"><div class="stat-num" id="st-rev" style="font-size:14px">0</div><div class="stat-lbl">Revenue</div></div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+
+    <!-- ══ STOCK PAGE ══ -->
+    <div class="page" id="pg-stock">
+      <div class="card" id="add-prod-card">
+        <div class="card-title">Add Product to Stock</div>
+        <div style="background:#EBF5FB;border:1px solid #AED6F1;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#185FA5">
+          💡 <b>Step 1:</b> Add all products with barcodes. <b>Step 2:</b> Go to Scan & Dispatch to process orders. Stock auto-updates!
+        </div>
+        <div class="form-grid">
+          <div class="fr"><label>Brand *</label>
+            <select id="p-brand">
+              <option value="Mantashani">Mantashani</option>
+              <option value="Rici Melion">Rici Melion</option>
+            </select>
+          </div>
+          <div class="fr"><label>Barcode *</label><input id="p-bc" placeholder="e.g. MTS-001-BLK"></div>
+          <div class="fr"><label>Product Name *</label><input id="p-nm" placeholder="Product name"></div>
+          <div class="fr"><label>Category *</label>
+            <select id="p-cat">
+              <optgroup label="Mantashani">
+                <option>Unstitched</option><option>Kameez Shalwar</option>
+                <option>Kurta Trouser</option><option>Waistcoat</option><option>Prince Coat</option>
+              </optgroup>
+              <optgroup label="Rici Melion">
+                <option>Three Piece</option><option>Two Piece</option><option>Blazer</option>
+                <option>Trousers</option><option>Shirts</option><option>Shoes</option><option>Accessories</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="fr"><label>Price (PKR) *</label><input id="p-pr" type="number" placeholder="10350"></div>
+          <div class="fr"><label>Opening Stock *</label><input id="p-st" type="number" placeholder="50"></div>
+          <div class="fr"><label>Min Stock Alert</label><input id="p-min" type="number" placeholder="5" value="5"></div>
+        </div>
+        <button class="btn btn-green" onclick="addProduct()">+ Add to Stock</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>Current Stock</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="sb-brand" onchange="renderStock()" style="padding:5px 8px;font-size:11px;border:1px solid #DDD;border-radius:6px">
+              <option value="">All Brands</option>
+              <option>Mantashani</option><option>Rici Melion</option>
+            </select>
+            <select id="sb-cat" onchange="renderStock()" style="padding:5px 8px;font-size:11px;border:1px solid #DDD;border-radius:6px">
+              <option value="">All Categories</option>
+              <option>Unstitched</option><option>Kameez Shalwar</option><option>Kurta Trouser</option>
+              <option>Waistcoat</option><option>Prince Coat</option><option>Three Piece</option>
+              <option>Two Piece</option><option>Blazer</option><option>Trousers</option>
+              <option>Shirts</option><option>Shoes</option><option>Accessories</option>
+            </select>
+            <input id="sb-q" placeholder="Search..." oninput="renderStock()" style="padding:5px 9px;font-size:11px;border:1px solid #DDD;border-radius:6px;width:140px">
+            <button class="btn btn-outline btn-sm" onclick="exportStockCSV()">Export</button>
+          </div>
+        </div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Brand</th><th>Barcode</th><th>Product Name</th><th>Category</th>
+              <th>Price</th><th>Opening</th><th>Restocked</th><th>Returns</th><th>Out</th><th>Remaining</th><th>Status</th><th id="sath"></th>
+            </tr></thead>
+            <tbody id="stb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RESTOCK PAGE ══ -->
+    <div class="page" id="pg-restock">
+      <div class="card">
+        <div class="card-title">Restock Product</div>
+        <div style="background:#D5F5E3;border:1px solid #2D6A4F;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#155724">
+          ✅ Use this when new stock arrives. Select product and enter quantity received.
+        </div>
+        <div class="form-grid">
+          <div class="fr"><label>Select Product *</label>
+            <select id="rs-bc"><option value="">-- Select Product --</option></select>
+          </div>
+          <div class="fr"><label>Quantity Received *</label><input id="rs-qty" type="number" placeholder="e.g. 20"></div>
+          <div class="fr"><label>Notes (optional)</label><input id="rs-note" placeholder="e.g. New shipment arrived"></div>
+        </div>
+        <button class="btn btn-green" onclick="restockProduct()">+ Add Restock</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Restock History</div>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Date</th><th>Brand</th><th>Product</th><th>Category</th><th>Qty Added</th><th>Notes</th><th>By</th></tr></thead>
+            <tbody id="rstb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SCAN PAGE ══ -->
+    <div class="page" id="pg-scan">
+      <!-- Active Order Session -->
+      <div class="session-box">
+        <div class="session-header">
+          <div>
+            <div class="session-title">📦 Order Session</div>
+            <div style="font-size:11px;color:#888;margin-top:2px">Scan all items for one order, then close order</div>
+          </div>
+          <div id="sess-badge" class="session-badge">No Active Order</div>
+        </div>
+
+        <div id="scan-alert" class="alert"></div>
+
+        <div class="form-grid" style="margin-bottom:12px">
+          <div class="fr"><label>Order Number *</label><input id="ord-num" placeholder="ORD-001"></div>
+          <div class="fr"><label>Customer Name</label><input id="ord-cust" placeholder="Optional"></div>
+        </div>
+
+        <div id="no-session" style="text-align:center;padding:20px">
+          <button class="btn btn-green" style="padding:12px 30px;font-size:13px" onclick="startSession()">▶ Start New Order</button>
+        </div>
+
+        <div id="active-session" style="display:none">
+          <div class="scan-box">
+            <input type="text" class="scan-input" id="scan-input" placeholder="📷  Scan barcode here...">
+            <button class="btn btn-red" style="padding:12px 20px;font-size:13px" onclick="scanBarcode()">SCAN</button>
+          </div>
+
+          <div id="scanned-list" class="scanned-items">
+            <div class="empty">No items scanned yet. Scan first item above.</div>
+          </div>
+
+          <div id="sess-summary" style="display:none;background:#FFF9F0;border:1px solid #C9A84C;border-radius:8px;padding:12px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <span style="font-size:12px;color:#666">Total Items: </span><span id="sess-items" style="font-size:14px;font-weight:700;color:#8B0000">0</span>
+                <span style="margin-left:16px;font-size:12px;color:#666">Total Amount: </span><span id="sess-total" style="font-size:14px;font-weight:700;color:#2D6A4F">Rs. 0</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-green" style="flex:1" onclick="closeOrder()">✅ Close Order & Dispatch</button>
+            <button class="btn btn-danger" onclick="cancelSession()">✖ Cancel Order</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Stock -->
+      <div class="card">
+        <div class="card-title">Quick Stock View</div>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Brand</th><th>Barcode</th><th>Product</th><th>Category</th><th>Remaining</th><th>Status</th></tr></thead>
+            <tbody id="qtb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RETURN/EXCHANGE PAGE ══ -->
+    <div class="page" id="pg-return">
+      <div class="card">
+        <div class="card-title">Process Return / Exchange</div>
+        <div style="background:#E8DAEF;border:1px solid #8E44AD;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#6C3483">
+          🔄 When customer returns a product — scan barcode and stock will be added back automatically.
+        </div>
+        <div class="form-grid">
+          <div class="fr"><label>Order # (Original)</label><input id="ret-ord" placeholder="ORD-001"></div>
+          <div class="fr"><label>Barcode (Scan/Enter) *</label><input id="ret-bc" placeholder="Scan or type barcode"></div>
+          <div class="fr"><label>Return Type *</label>
+            <select id="ret-type">
+              <option value="return">Return (Stock Back)</option>
+              <option value="exchange">Exchange (Stock Back + New Out)</option>
+              <option value="damaged">Damaged Return (No Stock Back)</option>
+            </select>
+          </div>
+          <div class="fr"><label>Reason</label>
+            <select id="ret-reason">
+              <option>Wrong Item Delivered</option><option>Size Issue</option><option>Quality Issue</option>
+              <option>Customer Changed Mind</option><option>Damaged in Transit</option><option>Other</option>
+            </select>
+          </div>
+          <div class="fr"><label>New Barcode (Exchange only)</label><input id="ret-new-bc" placeholder="New product barcode"></div>
+          <div class="fr"><label>Notes</label><input id="ret-note" placeholder="Optional notes"></div>
+        </div>
+        <div id="ret-alert" class="alert"></div>
+        <button class="btn btn-orange" onclick="processReturn()">Process Return/Exchange</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Return / Exchange History</div>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Date</th><th>Order #</th><th>Barcode</th><th>Product</th><th>Type</th><th>Reason</th><th>Stock Back</th><th>By</th></tr></thead>
+            <tbody id="rettb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ OUT SHEET PAGE ══ -->
+    <div class="page" id="pg-out">
+      <div class="fbar">
+        <div><label>From</label><input type="date" id="of"></div>
+        <div><label>To</label><input type="date" id="ot"></div>
+        <div><label>Order #</label><input id="oo" placeholder="Search..."></div>
+        <div><label>Brand</label><select id="ob"><option value="">All</option><option>Mantashani</option><option>Rici Melion</option></select></div>
+        <div><label>Category</label><select id="oc"><option value="">All</option><option>Unstitched</option><option>Kameez Shalwar</option><option>Kurta Trouser</option><option>Waistcoat</option><option>Prince Coat</option><option>Three Piece</option><option>Two Piece</option><option>Blazer</option><option>Trousers</option><option>Shirts</option><option>Shoes</option><option>Accessories</option></select></div>
+        <button class="btn btn-red" onclick="renderOut()">Filter</button>
+        <button class="btn btn-outline" onclick="clearOf()">Clear</button>
+        <button class="btn btn-gold" onclick="exportOutCSV()">Export CSV</button>
+      </div>
+      <div id="out-sum" class="sumbox" style="display:none">
+        <h3>Filtered Summary</h3>
+        <div class="sgrid">
+          <div><div class="snum" id="fs-o">0</div><div class="slbl">Orders</div></div>
+          <div><div class="snum" id="fs-i">0</div><div class="slbl">Items</div></div>
+          <div><div class="snum" id="fs-r">Rs. 0</div><div class="slbl">Revenue</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Out Sheet — All Dispatched Orders</div>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Date</th><th>Time</th><th>Order #</th><th>Customer</th><th>Brand</th><th>Barcode</th><th>Product</th><th>Category</th><th>Price</th><th>By</th></tr></thead>
+            <tbody id="otb"></tbody>
+          </table>
+        </div>
+        <div id="out-tot" style="text-align:right;padding:10px 0 0;font-size:13px;font-weight:600;color:#2D6A4F"></div>
+      </div>
+    </div>
+
+    <!-- ══ REPLENISHMENT PAGE ══ -->
+    <div class="page" id="pg-repl">
+      <div class="card">
+        <div class="card-title">Replenishment Report — Low Stock Alert</div>
+        <div class="fbar" style="margin-bottom:14px">
+          <div><label>Brand</label><select id="rp-br"><option value="">All Brands</option><option>Mantashani</option><option>Rici Melion</option></select></div>
+          <div><label>Threshold</label><input type="number" id="rp-th" value="5" style="width:70px"></div>
+          <button class="btn btn-red" onclick="renderRepl()">Generate</button>
+          <button class="btn btn-gold" onclick="exportReplCSV()">Export CSV</button>
+        </div>
+        <div id="repl-content"></div>
+      </div>
+    </div>
+
+    <!-- ══ DATE REPORT PAGE ══ -->
+    <div class="page" id="pg-report">
+      <div class="fbar">
+        <div><label>From</label><input type="date" id="rf"></div>
+        <div><label>To</label><input type="date" id="rt"></div>
+        <div><label>Group By</label><select id="rg"><option value="day">Day</option><option value="product">Product</option><option value="category">Category</option><option value="brand">Brand</option></select></div>
+        <button class="btn btn-red" onclick="renderReport()">Generate</button>
+        <button class="btn btn-gold" onclick="exportRepCSV()">Export</button>
+      </div>
+      <div id="rep-sum" class="sumbox" style="display:none">
+        <h3>Report Summary</h3>
+        <div class="sgrid">
+          <div><div class="snum" id="rsd">0</div><div class="slbl">Days</div></div>
+          <div><div class="snum" id="rso">0</div><div class="slbl">Orders</div></div>
+          <div><div class="snum" id="rsi">0</div><div class="slbl">Items</div></div>
+          <div><div class="snum" id="rsr">Rs. 0</div><div class="slbl">Revenue</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" id="rep-title">Report</div>
+        <div class="tw"><table id="rep-tbl"><thead id="rep-th"></thead><tbody id="rep-tb"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ══ USERS PAGE ══ -->
+    <div class="page" id="pg-users">
+      <div class="card">
+        <div class="card-title">Add New User</div>
+        <div class="form-grid">
+          <div class="fr"><label>Full Name *</label><input id="un" placeholder="Ahmed Khan"></div>
+          <div class="fr"><label>Username *</label><input id="uu" placeholder="ahmed123"></div>
+          <div class="fr"><label>Password *</label><input id="up" type="password" placeholder="Min 6 chars"></div>
+          <div class="fr"><label>Role</label>
+            <select id="ur" onchange="setDefAccess()">
+              <option value="dispatcher">Dispatcher</option>
+              <option value="csr">CSR</option>
+              <option value="viewer">Viewer</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#666">Access Permissions</div>
+        <div class="acc-grid">
+          <div class="acc-item"><input type="checkbox" id="ac-stock"><label for="ac-stock">📦 Stock</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-restock"><label for="ac-restock">🔄 Restock</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-scan"><label for="ac-scan">📷 Scan</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-return"><label for="ac-return">↩️ Returns</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-out"><label for="ac-out">📄 Out Sheet</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-repl"><label for="ac-repl">🔔 Replenishment</label></div>
+          <div class="acc-item"><input type="checkbox" id="ac-report"><label for="ac-report">📊 Reports</label></div>
+        </div>
+        <div id="ua" class="alert" style="margin-top:10px"></div>
+        <button class="btn btn-green" style="margin-top:12px" onclick="addUser()">+ Add User</button>
+      </div>
+      <div class="card">
+        <div class="card-title">All Users</div>
+        <div id="ulist"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI CHAT -->
+<div class="ai-box" id="ai-box" style="display:none">
+  <div class="ai-panel" id="ai-panel">
+    <div class="ai-header">
+      <span>🤖 Stock AI Assistant</span>
+      <button onclick="toggleAI()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="ai-messages" id="ai-msgs">
+      <div class="ai-msg bot"><div class="bubble">Hi! I'm your Stock Assistant. Ask me anything about stock, orders, or products! 😊</div></div>
+    </div>
+    <div class="ai-suggestions">
+      <button class="ai-sug" onclick="aiAsk('What products are low on stock?')">Low Stock?</button>
+      <button class="ai-sug" onclick="aiAsk('How many orders today?')">Today Orders?</button>
+      <button class="ai-sug" onclick="aiAsk('Total revenue this month?')">Revenue?</button>
+      <button class="ai-sug" onclick="aiAsk('Which product sold the most?')">Top Product?</button>
+    </div>
+    <div class="ai-input-row">
+      <input class="ai-input" id="ai-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendAI()">
+      <button class="ai-send" onclick="sendAI()">Send</button>
+    </div>
+  </div>
+  <button class="ai-toggle" onclick="toggleAI()">🤖</button>
+</div>
+
+<script>
+// ── DATA ──
+let products=JSON.parse(localStorage.getItem('sms_prod')||'[]');
+let outSheet=JSON.parse(localStorage.getItem('sms_out')||'[]');
+let restocks=JSON.parse(localStorage.getItem('sms_restock')||'[]');
+let returns=JSON.parse(localStorage.getItem('sms_returns')||'[]');
+let users=JSON.parse(localStorage.getItem('sms_users')||'[]');
+let currentUser=null;
+let currentSession=null;
+
+if(!users.length){
+  users=[{id:'mgr001',name:'Junaid Ali',username:'manager',password:'manager123',role:'manager',access:['stock','restock','scan','return','out','repl','report','users']}];
+  saveUsers();
+}
+
+function save(){try{localStorage.setItem('sms_prod',JSON.stringify(products));localStorage.setItem('sms_out',JSON.stringify(outSheet));}catch(e){}}
+function saveUsers(){try{localStorage.setItem('sms_users',JSON.stringify(users));}catch(e){}}
+function saveRest(){try{localStorage.setItem('sms_restock',JSON.stringify(restocks));}catch(e){}}
+function saveRet(){try{localStorage.setItem('sms_returns',JSON.stringify(returns));}catch(e){}}
+
+// ── AUTH ──
+function login(){
+  const u=document.getElementById('lu').value.trim().toLowerCase();
+  const p=document.getElementById('lp').value.trim();
+  const user=users.find(x=>x.username.toLowerCase()===u&&x.password===p);
+  if(!user){const e=document.getElementById('lerr');e.style.display='block';setTimeout(()=>e.style.display='none',3000);return;}
+  currentUser=user;
+  document.getElementById('ls').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('ai-box').style.display='block';
+  document.getElementById('ubadge').textContent=user.name+' ('+user.role.toUpperCase()+')';
+  buildTabs();
+  const acc=currentUser.role==='manager'?['stock','restock','scan','return','out','repl','report','users']:(currentUser.access||[]);
+  switchTab(acc[0]||'scan');
+  updateStats();
+}
+
+function logout(){
+  currentUser=null;currentSession=null;
+  document.getElementById('ls').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('ai-box').style.display='none';
+  document.getElementById('lu').value='';document.getElementById('lp').value='';
+}
+
+// ── TABS ──
+const TABS=[
+  {id:'stock',label:'📦 Stock'},{id:'restock',label:'🔄 Restock'},
+  {id:'scan',label:'📷 Scan & Dispatch'},{id:'return',label:'↩️ Return/Exchange'},
+  {id:'out',label:'📄 Out Sheet'},{id:'repl',label:'🔔 Replenishment'},
+  {id:'report',label:'📊 Reports'},{id:'users',label:'👥 Users'},
+];
+
+function buildTabs(){
+  const acc=currentUser.role==='manager'?['stock','restock','scan','return','out','repl','report','users']:(currentUser.access||[]);
+  document.getElementById('tabs').innerHTML=TABS.filter(t=>acc.includes(t.id)).map(t=>`<button class="tab" onclick="switchTab('${t.id}')" id="tab-${t.id}">${t.label}</button>`).join('');
+}
+
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  const tb=document.getElementById('tab-'+id);if(tb) tb.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('pg-'+id);if(pg) pg.classList.add('active');
+  if(id==='stock'){renderStock();populateRestockSelect();}
+  if(id==='restock'){populateRestockSelect();renderRestocks();}
+  if(id==='scan') renderQuick();
+  if(id==='return') renderReturns();
+  if(id==='out'){setDates();renderOut();}
+  if(id==='repl') renderRepl();
+  if(id==='report') setDates();
+  if(id==='users') renderUsers();
+  updateStats();
+}
+
+// ── HELPERS ──
+function getRem(bc){
+  const p=products.find(x=>x.barcode===bc);if(!p) return 0;
+  const addedRestock=restocks.filter(r=>r.barcode===bc).reduce((s,r)=>s+r.qty,0);
+  const addedReturns=returns.filter(r=>r.barcode===bc&&r.stockBack).length;
+  const out=outSheet.filter(o=>o.barcode===bc).length;
+  return p.opening+addedRestock+addedReturns-out;
+}
+
+function getStatus(rem,min=5){
+  if(rem<=0) return '<span class="badge b-out">Out of Stock</span>';
+  if(rem<=min) return '<span class="badge b-low">Low Stock</span>';
+  return '<span class="badge b-in">In Stock</span>';
+}
+
+function now(){
+  const d=new Date();
+  return{date:d.toLocaleDateString('en-CA'),time:d.toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'}),
+  full:d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'})};
+}
+
+function fmtDate(d){if(!d) return '';return new Date(d+'T00:00:00').toLocaleDateString('en-PK',{day:'2-digit',month:'short',year:'numeric'});}
+function fmtPKR(n){return 'Rs. '+Number(n).toLocaleString();}
+
+// ── STOCK ──
+function addProduct(){
+  const brand=document.getElementById('p-brand').value;
+  const bc=document.getElementById('p-bc').value.trim().toUpperCase();
+  const nm=document.getElementById('p-nm').value.trim();
+  const cat=document.getElementById('p-cat').value;
+  const pr=parseInt(document.getElementById('p-pr').value)||0;
+  const st=parseInt(document.getElementById('p-st').value)||0;
+  const min=parseInt(document.getElementById('p-min').value)||5;
+  if(!bc||!nm||!pr||!st){alert('Fill all required fields!');return;}
+  if(products.find(p=>p.barcode===bc)){alert('Barcode exists!');return;}
+  products.push({barcode:bc,brand,name:nm,cat,price:pr,opening:st,minStock:min});
+  save();renderStock();updateStats();populateRestockSelect();
+  ['p-bc','p-nm','p-pr','p-st'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('p-min').value='5';
+}
+
+function deleteProduct(bc){
+  if(currentUser.role!=='manager'){alert('Manager only!');return;}
+  if(!confirm('Remove product?')) return;
+  products=products.filter(p=>p.barcode!==bc);save();renderStock();updateStats();
+}
+
+function renderStock(){
+  const q=(document.getElementById('sb-q')?.value||'').toLowerCase();
+  const brand=document.getElementById('sb-brand')?.value||'';
+  const cat=document.getElementById('sb-cat')?.value||'';
+  const isMgr=currentUser?.role==='manager';
+  if(isMgr) document.getElementById('sath').textContent='Action';
+  const list=products.filter(p=>{
+    if(brand&&p.brand!==brand) return false;
+    if(cat&&p.cat!==cat) return false;
+    if(q&&!(p.barcode.toLowerCase().includes(q)||p.name.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const tbody=document.getElementById('stb');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="12" class="empty">No products. Add products above.</td></tr>';return;}
+  tbody.innerHTML=list.map(p=>{
+    const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
+    const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
+    const out=outSheet.filter(o=>o.barcode===p.barcode).length;
+    const rem=p.opening+rs+ret-out;
+    const brandColor=p.brand==='Mantashani'?'brand-m':'brand-r';
+    return `<tr>
+      <td><span class="brand-tag ${brandColor}">${p.brand}</span></td>
+      <td class="oid">${p.barcode}</td>
+      <td style="font-weight:500">${p.name}</td>
+      <td style="color:#666;font-size:11px">${p.cat}</td>
+      <td class="price">${fmtPKR(p.price)}</td>
+      <td style="text-align:center;font-weight:600">${p.opening}</td>
+      <td style="text-align:center;color:#2D6A4F;font-weight:600">${rs}</td>
+      <td style="text-align:center;color:#8E44AD;font-weight:600">${ret}</td>
+      <td style="text-align:center;color:#A32D2D;font-weight:600">${out}</td>
+      <td style="text-align:center;font-size:18px;font-weight:700;color:${rem<=0?'#A32D2D':rem<=(p.minStock||5)?'#854F0B':'#155724'}">${rem}</td>
+      <td>${getStatus(rem,p.minStock||5)}</td>
+      <td>${isMgr?`<button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.barcode}')">Del</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── RESTOCK ──
+function populateRestockSelect(){
+  const sel=document.getElementById('rs-bc');
+  if(!sel) return;
+  sel.innerHTML='<option value="">-- Select Product --</option>'+products.map(p=>`<option value="${p.barcode}">[${p.brand}] ${p.name} (${p.barcode}) — Stock: ${getRem(p.barcode)}</option>`).join('');
+}
+
+function restockProduct(){
+  const bc=document.getElementById('rs-bc').value;
+  const qty=parseInt(document.getElementById('rs-qty').value)||0;
+  const note=document.getElementById('rs-note').value.trim();
+  if(!bc||!qty){alert('Select product and enter quantity!');return;}
+  const prod=products.find(p=>p.barcode===bc);
+  const n=now();
+  restocks.push({date:n.date,time:n.time,barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,qty,note,by:currentUser.name});
+  saveRest();renderRestocks();renderStock();updateStats();populateRestockSelect();
+  document.getElementById('rs-qty').value='';document.getElementById('rs-note').value='';
+  alert(`✅ Restocked ${qty} units of "${prod.name}"`);
+}
+
+function renderRestocks(){
+  const tbody=document.getElementById('rstb');
+  if(!restocks.length){tbody.innerHTML='<tr><td colspan="7" class="empty">No restock history.</td></tr>';return;}
+  tbody.innerHTML=[...restocks].reverse().map(r=>`
+    <tr>
+      <td style="font-size:11px;color:#666">${fmtDate(r.date)}</td>
+      <td><span class="brand-tag ${r.brand==='Mantashani'?'brand-m':'brand-r'}">${r.brand}</span></td>
+      <td style="font-weight:500">${r.name}</td>
+      <td style="font-size:11px;color:#666">${r.cat}</td>
+      <td style="text-align:center;font-weight:700;color:#2D6A4F;font-size:16px">+${r.qty}</td>
+      <td style="font-size:11px;color:#666">${r.note||'-'}</td>
+      <td style="font-size:11px;color:#888">${r.by}</td>
+    </tr>`).join('');
+}
+
+// ── SCAN SESSION ──
+function startSession(){
+  const ord=document.getElementById('ord-num').value.trim();
+  if(!ord){alert('Enter Order Number first!');return;}
+  if(outSheet.find(o=>o.order===ord)){if(!confirm(`Order ${ord} already has items. Continue adding?`)) return;}
+  currentSession={order:ord,customer:document.getElementById('ord-cust').value.trim(),items:[],startTime:now().full};
+  document.getElementById('no-session').style.display='none';
+  document.getElementById('active-session').style.display='block';
+  document.getElementById('sess-badge').textContent='🟢 Active: '+ord;
+  document.getElementById('sess-badge').className='session-badge active';
+  document.getElementById('scan-input').focus();
+  renderSession();
+}
+
+function scanBarcode(){
+  const bc=document.getElementById('scan-input').value.trim().toUpperCase();
+  const alertEl=document.getElementById('scan-alert');
+  if(!bc) return;
+  const prod=products.find(p=>p.barcode===bc);
+  if(!prod){
+    alertEl.className='alert e';alertEl.textContent=`❌ Barcode "${bc}" not found in stock!`;alertEl.style.display='block';
+    setTimeout(()=>alertEl.style.display='none',3000);
+    document.getElementById('scan-input').value='';return;
+  }
+  const sessionOut=currentSession.items.filter(i=>i.barcode===bc).length;
+  const totalOut=outSheet.filter(o=>o.barcode===bc).length;
+  const rem=getRem(bc)-sessionOut;
+  if(rem<=0){
+    alertEl.className='alert e';alertEl.textContent=`❌ Out of stock! "${prod.name}" = 0 remaining.`;alertEl.style.display='block';
+    setTimeout(()=>alertEl.style.display='none',3000);
+    document.getElementById('scan-input').value='';return;
+  }
+  currentSession.items.push({barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,price:prod.price,scanTime:now().time});
+  alertEl.className='alert s';alertEl.textContent=`✅ Scanned: ${prod.name} | Remaining: ${rem-1}`;alertEl.style.display='block';
+  setTimeout(()=>alertEl.style.display='none',2000);
+  document.getElementById('scan-input').value='';
+  document.getElementById('scan-input').focus();
+  renderSession();
+}
+
+document.addEventListener('keydown',e=>{
+  const si=document.getElementById('scan-input');
+  if(e.key==='Enter'&&si&&si===document.activeElement) scanBarcode();
+});
+
+function removeSessionItem(idx){
+  currentSession.items.splice(idx,1);renderSession();
+}
+
+function renderSession(){
+  const list=document.getElementById('scanned-list');
+  const sumDiv=document.getElementById('sess-summary');
+  if(!currentSession||!currentSession.items.length){
+    list.innerHTML='<div class="empty">No items scanned yet.</div>';
+    sumDiv.style.display='none';return;
+  }
+  sumDiv.style.display='block';
+  const total=currentSession.items.reduce((s,i)=>s+i.price,0);
+  document.getElementById('sess-items').textContent=currentSession.items.length;
+  document.getElementById('sess-total').textContent=fmtPKR(total);
+  // Group by barcode for display
+  const grouped={};
+  currentSession.items.forEach((item,idx)=>{
+    const key=item.barcode;
+    if(!grouped[key]) grouped[key]={...item,qty:0,indices:[]};
+    grouped[key].qty++;grouped[key].indices.push(idx);
+  });
+  list.innerHTML=Object.values(grouped).map(g=>`
+    <div class="scanned-item">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${g.brand}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600">${g.name}</div>
+          <div style="font-size:10px;color:#888">${g.barcode} | ${g.cat}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:13px;font-weight:700;color:#8B0000">×${g.qty}</span>
+        <span class="price">${fmtPKR(g.price*g.qty)}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeSessionItem(${g.indices[g.indices.length-1]})">-1</button>
+      </div>
+    </div>`).join('');
+}
+
+function closeOrder(){
+  if(!currentSession||!currentSession.items.length){alert('No items scanned!');return;}
+  const n=now();
+  currentSession.items.forEach(item=>{
+    outSheet.push({date:n.date,time:n.time,order:currentSession.order,customer:currentSession.customer,
+    barcode:item.barcode,name:item.name,brand:item.brand,cat:item.cat,price:item.price,by:currentUser.name});
+  });
+  save();
+  const total=currentSession.items.reduce((s,i)=>s+i.price,0);
+  alert(`✅ Order ${currentSession.order} closed!\n${currentSession.items.length} items dispatched\nTotal: ${fmtPKR(total)}`);
+  resetSession();updateStats();renderQuick();
+}
+
+function cancelSession(){
+  if(!confirm('Cancel this order? All scanned items will be removed.')) return;
+  resetSession();
+}
+
+function resetSession(){
+  currentSession=null;
+  document.getElementById('no-session').style.display='block';
+  document.getElementById('active-session').style.display='none';
+  document.getElementById('sess-badge').textContent='No Active Order';
+  document.getElementById('sess-badge').className='session-badge';
+  document.getElementById('ord-num').value='';document.getElementById('ord-cust').value='';
+  document.getElementById('scanned-list').innerHTML='<div class="empty">No items scanned yet.</div>';
+  document.getElementById('sess-summary').style.display='none';
+  document.getElementById('scan-alert').style.display='none';
+}
+
+function renderQuick(){
+  const tbody=document.getElementById('qtb');
+  if(!products.length){tbody.innerHTML='<tr><td colspan="6" class="empty">No products yet.</td></tr>';return;}
+  tbody.innerHTML=products.map(p=>{
+    const rem=getRem(p.barcode);
+    return `<tr>
+      <td><span class="brand-tag ${p.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${p.brand}</span></td>
+      <td class="oid" style="font-size:10px">${p.barcode}</td>
+      <td style="font-size:11px;font-weight:500">${p.name}</td>
+      <td style="font-size:11px;color:#666">${p.cat}</td>
+      <td style="text-align:center;font-weight:700;font-size:16px;color:${rem<=0?'#A32D2D':rem<=(p.minStock||5)?'#854F0B':'#155724'}">${rem}</td>
+      <td>${getStatus(rem,p.minStock||5)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── RETURNS ──
+function processReturn(){
+  const bc=document.getElementById('ret-bc').value.trim().toUpperCase();
+  const ord=document.getElementById('ret-ord').value.trim();
+  const type=document.getElementById('ret-type').value;
+  const reason=document.getElementById('ret-reason').value;
+  const newBc=document.getElementById('ret-new-bc').value.trim().toUpperCase();
+  const note=document.getElementById('ret-note').value.trim();
+  const alertEl=document.getElementById('ret-alert');
+  if(!bc){alertEl.className='alert e';alertEl.textContent='Enter barcode!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
+  const prod=products.find(p=>p.barcode===bc);
+  if(!prod){alertEl.className='alert e';alertEl.textContent=`Product "${bc}" not found!`;alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
+  const stockBack=type==='return'||type==='exchange';
+  const n=now();
+  returns.push({date:n.date,time:n.time,order:ord||'-',barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,price:prod.price,type,reason,note,stockBack,by:currentUser.name});
+  if(type==='exchange'&&newBc){
+    const newProd=products.find(p=>p.barcode===newBc);
+    if(newProd){
+      const remNew=getRem(newBc);
+      if(remNew>0){
+        outSheet.push({date:n.date,time:n.time,order:ord||'EXCHANGE',customer:'Exchange',barcode:newBc,name:newProd.name,brand:newProd.brand,cat:newProd.cat,price:newProd.price,by:currentUser.name});
+        save();
+      }
+    }
+  }
+  saveRet();renderReturns();renderStock();updateStats();
+  alertEl.className='alert s';alertEl.textContent=`✅ ${type==='return'?'Return':'Exchange'} processed for "${prod.name}"${stockBack?' — Stock added back!':' — No stock returned (damaged).'}`;alertEl.style.display='block';
+  setTimeout(()=>alertEl.style.display='none',4000);
+  ['ret-bc','ret-ord','ret-new-bc','ret-note'].forEach(id=>document.getElementById(id).value='');
+}
+
+function renderReturns(){
+  const tbody=document.getElementById('rettb');
+  if(!returns.length){tbody.innerHTML='<tr><td colspan="8" class="empty">No returns yet.</td></tr>';return;}
+  tbody.innerHTML=[...returns].reverse().map(r=>`
+    <tr>
+      <td style="font-size:11px;color:#666">${fmtDate(r.date)}</td>
+      <td class="oid">${r.order}</td>
+      <td style="font-family:monospace;font-size:11px">${r.barcode}</td>
+      <td style="font-size:11px;font-weight:500">${r.name}</td>
+      <td><span class="badge ${r.type==='return'?'b-return':r.type==='exchange'?'b-low':'b-out'}">${r.type}</span></td>
+      <td style="font-size:11px;color:#666">${r.reason}</td>
+      <td><span class="badge ${r.stockBack?'b-in':'b-out'}">${r.stockBack?'Yes':'No'}</span></td>
+      <td style="font-size:11px;color:#888">${r.by}</td>
+    </tr>`).join('');
+}
+
+// ── OUT SHEET ──
+function getFiltOut(){
+  const from=document.getElementById('of')?.value||'';
+  const to=document.getElementById('ot')?.value||'';
+  const ord=(document.getElementById('oo')?.value||'').toLowerCase();
+  const brand=document.getElementById('ob')?.value||'';
+  const cat=document.getElementById('oc')?.value||'';
+  return outSheet.filter(o=>{
+    if(from&&o.date<from) return false;
+    if(to&&o.date>to) return false;
+    if(ord&&!o.order.toLowerCase().includes(ord)) return false;
+    if(brand&&o.brand!==brand) return false;
+    if(cat&&o.cat!==cat) return false;
+    return true;
+  });
+}
+
+function renderOut(){
+  const list=getFiltOut();
+  const tbody=document.getElementById('otb');
+  const sb=document.getElementById('out-sum');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="10" class="empty">No orders found.</td></tr>';document.getElementById('out-tot').textContent='';sb.style.display='none';return;}
+  const total=list.reduce((s,o)=>s+o.price,0);
+  const uO=new Set(list.map(o=>o.order)).size;
+  sb.style.display='block';
+  document.getElementById('fs-o').textContent=uO;
+  document.getElementById('fs-i').textContent=list.length;
+  document.getElementById('fs-r').textContent=fmtPKR(total);
+  tbody.innerHTML=[...list].reverse().map(o=>`
+    <tr>
+      <td style="font-size:11px;color:#666;white-space:nowrap">${fmtDate(o.date)}</td>
+      <td style="font-size:11px;color:#888">${o.time}</td>
+      <td class="oid">${o.order}</td>
+      <td style="font-size:11px">${o.customer||'-'}</td>
+      <td><span class="brand-tag ${o.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${o.brand}</span></td>
+      <td style="font-family:monospace;font-size:10px">${o.barcode}</td>
+      <td style="font-size:11px;font-weight:500">${o.name}</td>
+      <td style="font-size:10px;color:#666">${o.cat}</td>
+      <td class="price">${fmtPKR(o.price)}</td>
+      <td style="font-size:10px;color:#888">${o.by||'-'}</td>
+    </tr>`).join('');
+  document.getElementById('out-tot').textContent=`${list.length} items | Orders: ${uO} | Revenue: ${fmtPKR(total)}`;
+}
+
+function clearOf(){
+  ['of','ot','oo'].forEach(id=>document.getElementById(id).value='');
+  ['ob','oc'].forEach(id=>document.getElementById(id).value='');
+  renderOut();
+}
+
+// ── REPLENISHMENT ──
+function renderRepl(){
+  const brand=document.getElementById('rp-br').value;
+  const th=parseInt(document.getElementById('rp-th').value)||5;
+  const list=products.filter(p=>{
+    if(brand&&p.brand!==brand) return false;
+    return getRem(p.barcode)<=(p.minStock||th);
+  });
+  const content=document.getElementById('repl-content');
+  if(!list.length){content.innerHTML='<div style="text-align:center;padding:30px;color:#2D6A4F;font-weight:600">✅ All products are sufficiently stocked!</div>';return;}
+  // Group by brand and category
+  const byBrandCat={};
+  list.forEach(p=>{
+    const key=p.brand+'||'+p.cat;
+    if(!byBrandCat[key]) byBrandCat[key]={brand:p.brand,cat:p.cat,items:[]};
+    byBrandCat[key].items.push(p);
+  });
+  content.innerHTML=`
+    <div style="background:#FADBD8;border:1px solid #E74C3C;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#A32D2D;font-weight:600">
+      ⚠️ ${list.length} product(s) need replenishment!
+    </div>`+
+  Object.values(byBrandCat).map(g=>`
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}">${g.brand}</span>
+        <span style="font-size:12px;font-weight:600;color:#333">${g.cat}</span>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Barcode</th><th>Product</th><th>Opening</th><th>Restocked</th><th>Returns</th><th>Out</th><th>Remaining</th><th>Min Stock</th><th>Need</th></tr></thead>
+          <tbody>
+            ${g.items.map(p=>{
+              const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
+              const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
+              const out=outSheet.filter(o=>o.barcode===p.barcode).length;
+              const rem=p.opening+rs+ret-out;
+              const need=Math.max(0,(p.minStock||5)*3-rem);
+              return `<tr>
+                <td class="oid" style="font-size:10px">${p.barcode}</td>
+                <td style="font-weight:500;font-size:11px">${p.name}</td>
+                <td style="text-align:center">${p.opening}</td>
+                <td style="text-align:center;color:#2D6A4F">+${rs}</td>
+                <td style="text-align:center;color:#8E44AD">+${ret}</td>
+                <td style="text-align:center;color:#A32D2D">-${out}</td>
+                <td style="text-align:center;font-weight:700;font-size:16px;color:${rem<=0?'#A32D2D':'#854F0B'}">${rem}</td>
+                <td style="text-align:center;color:#666">${p.minStock||5}</td>
+                <td style="text-align:center;font-weight:700;color:#E67E22">${need}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
+// ── REPORT ──
+function renderReport(){
+  const from=document.getElementById('rf').value;
+  const to=document.getElementById('rt').value;
+  const group=document.getElementById('rg').value;
+  let list=outSheet;
+  if(from) list=list.filter(o=>o.date>=from);
+  if(to) list=list.filter(o=>o.date<=to);
+  if(!list.length){document.getElementById('rep-tb').innerHTML='<tr><td colspan="6" class="empty">No data.</td></tr>';document.getElementById('rep-sum').style.display='none';return;}
+  const total=list.reduce((s,o)=>s+o.price,0);
+  const uD=new Set(list.map(o=>o.date)).size;
+  const uO=new Set(list.map(o=>o.order)).size;
+  document.getElementById('rep-sum').style.display='block';
+  document.getElementById('rsd').textContent=uD;document.getElementById('rso').textContent=uO;
+  document.getElementById('rsi').textContent=list.length;document.getElementById('rsr').textContent=fmtPKR(total);
+  let grouped={};
+  if(group==='day'){
+    document.getElementById('rep-title').textContent='Day-wise Report';
+    document.getElementById('rep-th').innerHTML='<tr><th>Date</th><th>Orders</th><th>Items</th><th>Revenue</th><th>Top Product</th><th>Top Brand</th></tr>';
+    list.forEach(o=>{
+      if(!grouped[o.date]) grouped[o.date]={orders:new Set(),items:0,revenue:0,products:{},brands:{}};
+      grouped[o.date].orders.add(o.order);grouped[o.date].items++;grouped[o.date].revenue+=o.price;
+      grouped[o.date].products[o.name]=(grouped[o.date].products[o.name]||0)+1;
+      grouped[o.date].brands[o.brand]=(grouped[o.date].brands[o.brand]||0)+1;
+    });
+    document.getElementById('rep-tb').innerHTML=Object.keys(grouped).sort().reverse().map(d=>{
+      const g=grouped[d];const tp=Object.entries(g.products).sort((a,b)=>b[1]-a[1])[0];const tb2=Object.entries(g.brands).sort((a,b)=>b[1]-a[1])[0];
+      return `<tr><td style="font-weight:600">${fmtDate(d)}</td><td style="text-align:center">${g.orders.size}</td><td style="text-align:center;font-weight:700;color:#8B0000">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="font-size:11px;color:#666">${tp?tp[0]+' ('+tp[1]+')':'-'}</td><td style="font-size:11px"><span class="brand-tag ${tb2?.[0]==='Mantashani'?'brand-m':'brand-r'}">${tb2?.[0]||'-'}</span></td></tr>`;
+    }).join('');
+  } else if(group==='product'){
+    document.getElementById('rep-title').textContent='Product-wise Report';
+    document.getElementById('rep-th').innerHTML='<tr><th>Brand</th><th>Barcode</th><th>Product</th><th>Category</th><th>Items Out</th><th>Revenue</th></tr>';
+    list.forEach(o=>{
+      if(!grouped[o.barcode]) grouped[o.barcode]={name:o.name,brand:o.brand,cat:o.cat,items:0,revenue:0};
+      grouped[o.barcode].items++;grouped[o.barcode].revenue+=o.price;
+    });
+    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([bc,g])=>`<tr><td><span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${g.brand}</span></td><td class="oid" style="font-size:10px">${bc}</td><td style="font-weight:500;font-size:11px">${g.name}</td><td style="font-size:11px;color:#666">${g.cat}</td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td></tr>`).join('');
+  } else if(group==='category'){
+    document.getElementById('rep-title').textContent='Category-wise Report';
+    document.getElementById('rep-th').innerHTML='<tr><th>Category</th><th>Items Out</th><th>Revenue</th><th>Avg Price</th><th>% Share</th></tr>';
+    list.forEach(o=>{if(!grouped[o.cat]) grouped[o.cat]={items:0,revenue:0};grouped[o.cat].items++;grouped[o.cat].revenue+=o.price;});
+    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([cat,g])=>`<tr><td style="font-weight:600">${cat}</td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="color:#666">${fmtPKR(Math.round(g.revenue/g.items))}</td><td style="font-weight:600">${Math.round(g.items/list.length*100)}%</td></tr>`).join('');
+  } else {
+    document.getElementById('rep-title').textContent='Brand-wise Report';
+    document.getElementById('rep-th').innerHTML='<tr><th>Brand</th><th>Items Out</th><th>Revenue</th><th>Avg Price</th><th>% Share</th></tr>';
+    list.forEach(o=>{if(!grouped[o.brand]) grouped[o.brand]={items:0,revenue:0};grouped[o.brand].items++;grouped[o.brand].revenue+=o.price;});
+    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([brand,g])=>`<tr><td><span class="brand-tag ${brand==='Mantashani'?'brand-m':'brand-r'}">${brand}</span></td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="color:#666">${fmtPKR(Math.round(g.revenue/g.items))}</td><td style="font-weight:600">${Math.round(g.items/list.length*100)}%</td></tr>`).join('');
+  }
+}
+
+// ── USERS ──
+function setDefAccess(){
+  const role=document.getElementById('ur').value;
+  const def={dispatcher:['stock','scan'],csr:['stock','out'],viewer:['stock','out','report'],manager:['stock','restock','scan','return','out','repl','report','users']};
+  const acc=def[role]||[];
+  ['stock','restock','scan','return','out','repl','report'].forEach(id=>{
+    const cb=document.getElementById('ac-'+id);if(cb) cb.checked=acc.includes(id);
+  });
+}
+
+function addUser(){
+  const name=document.getElementById('un').value.trim();
+  const username=document.getElementById('uu').value.trim().toLowerCase();
+  const password=document.getElementById('up').value.trim();
+  const role=document.getElementById('ur').value;
+  const alertEl=document.getElementById('ua');
+  if(!name||!username||!password){alertEl.className='alert e';alertEl.textContent='Fill all fields!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
+  if(password.length<6){alertEl.className='alert e';alertEl.textContent='Password min 6 chars!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
+  if(users.find(u=>u.username===username)){alertEl.className='alert e';alertEl.textContent='Username exists!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
+  const access=['stock','restock','scan','return','out','repl','report'].filter(id=>document.getElementById('ac-'+id)?.checked);
+  if(role==='manager') access.push('users');
+  users.push({id:'usr'+Date.now(),name,username,password,role,access});
+  saveUsers();
+  alertEl.className='alert s';alertEl.textContent=`✅ User "${name}" added!`;alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);
+  ['un','uu','up'].forEach(id=>document.getElementById(id).value='');
+  renderUsers();
+}
+
+function deleteUser(id){
+  if(id==='mgr001'){alert('Cannot delete default manager!');return;}
+  if(!confirm('Delete user?')) return;
+  users=users.filter(u=>u.id!==id);saveUsers();renderUsers();
+}
+
+function renderUsers(){
+  const rc={'manager':'#FADBD8','dispatcher':'#D5F5E3','csr':'#D6EAF8','viewer':'#F0F0F0'};
+  const tc={'manager':'#8B0000','dispatcher':'#155724','csr':'#185FA5','viewer':'#555'};
+  document.getElementById('ulist').innerHTML=users.map(u=>`
+    <div class="ucard">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="uavatar">${u.name.charAt(0)}</div>
+        <div>
+          <div class="uid">${u.name}</div>
+          <div class="uun">@${u.username}</div>
+          <div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap">
+            <span style="background:${rc[u.role]||'#F0F0F0'};color:${tc[u.role]||'#555'};padding:2px 7px;border-radius:20px;font-size:9px;font-weight:600">${u.role.toUpperCase()}</span>
+            ${(u.access||[]).filter(a=>a!=='users').map(a=>`<span style="background:#F0F0F0;color:#555;padding:2px 6px;border-radius:20px;font-size:9px">${a}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div>${u.id!=='mgr001'?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Remove</button>`:'<span style="font-size:11px;color:#888">Default</span>'}</div>
+    </div>`).join('');
+}
+
+// ── AI ASSISTANT ──
+function toggleAI(){
+  const panel=document.getElementById('ai-panel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')) document.getElementById('ai-in').focus();
+}
+
+function aiAsk(q){document.getElementById('ai-in').value=q;sendAI();}
+
+function addAIMsg(text,role){
+  const msgs=document.getElementById('ai-msgs');
+  const div=document.createElement('div');div.className='ai-msg '+role;
+  div.innerHTML=`<div class="bubble">${text}</div>`;
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+
+function sendAI(){
+  const input=document.getElementById('ai-in');
+  const q=input.value.trim().toLowerCase();
+  if(!q) return;
+  addAIMsg(input.value,'user');input.value='';
+
+  setTimeout(()=>{
+    const today=new Date().toLocaleDateString('en-CA');
+    let ans='';
+    if(q.includes('low stock')||q.includes('low')){
+      const low=products.filter(p=>getRem(p.barcode)<=(p.minStock||5)&&getRem(p.barcode)>0);
+      const out=products.filter(p=>getRem(p.barcode)<=0);
+      ans=`🔔 Low Stock: <b>${low.length} products</b><br>❌ Out of Stock: <b>${out.length} products</b>`;
+      if(low.length) ans+='<br><br>Low items: '+low.slice(0,5).map(p=>`${p.name} (${getRem(p.barcode)} left)`).join(', ');
+    } else if(q.includes('today')||q.includes('aaj')){
+      const todayOut=outSheet.filter(o=>o.date===today);
+      const rev=todayOut.reduce((s,o)=>s+o.price,0);
+      ans=`📊 Today's Summary:<br>Orders: <b>${new Set(todayOut.map(o=>o.order)).size}</b><br>Items Out: <b>${todayOut.length}</b><br>Revenue: <b>Rs. ${rev.toLocaleString()}</b>`;
+    } else if(q.includes('revenue')||q.includes('total')){
+      const rev=outSheet.reduce((s,o)=>s+o.price,0);
+      const mRev=outSheet.filter(o=>o.brand==='Mantashani').reduce((s,o)=>s+o.price,0);
+      const rRev=outSheet.filter(o=>o.brand==='Rici Melion').reduce((s,o)=>s+o.price,0);
+      ans=`💰 Total Revenue: <b>Rs. ${rev.toLocaleString()}</b><br>Mantashani: <b>Rs. ${mRev.toLocaleString()}</b><br>Rici Melion: <b>Rs. ${rRev.toLocaleString()}</b>`;
+    } else if(q.includes('top product')||q.includes('best')){
+      const counts={};outSheet.forEach(o=>{counts[o.name]=(counts[o.name]||0)+1;});
+      const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      ans=sorted.length?'🏆 Top Products:<br>'+sorted.map((p,i)=>`${i+1}. ${p[0]} (${p[1]} sold)`).join('<br>'):'No data yet.';
+    } else if(q.includes('stock')||q.includes('inventory')){
+      const total=products.reduce((s,p)=>s+getRem(p.barcode),0);
+      const mStock=products.filter(p=>p.brand==='Mantashani').reduce((s,p)=>s+getRem(p.barcode),0);
+      const rStock=products.filter(p=>p.brand==='Rici Melion').reduce((s,p)=>s+getRem(p.barcode),0);
+      ans=`📦 Total Stock: <b>${total} units</b><br>Mantashani: <b>${mStock}</b><br>Rici Melion: <b>${rStock}</b>`;
+    } else if(q.includes('return')){
+      ans=`↩️ Returns: <b>${returns.length} total</b><br>Stock returned: <b>${returns.filter(r=>r.stockBack).length}</b><br>Damaged: <b>${returns.filter(r=>!r.stockBack).length}</b>`;
+    } else if(q.includes('order')){
+      const uOrders=new Set(outSheet.map(o=>o.order)).size;
+      ans=`📋 Total Orders: <b>${uOrders}</b><br>Total Items: <b>${outSheet.length}</b>`;
+    } else if(q.includes('help')||q.includes('kya')){
+      ans='💡 I can help with:<br>• Low stock / inventory status<br>• Today\'s orders & revenue<br>• Total revenue by brand<br>• Top selling products<br>• Return/exchange stats<br><br>Just ask naturally!';
+    } else {
+      ans='🤔 I didn\'t understand. Try asking:<br>• "What products are low on stock?"<br>• "How many orders today?"<br>• "Total revenue?"<br>• "Which product sold most?"';
+    }
+    addAIMsg(ans,'bot');
+  },500);
+}
+
+// ── UTILS ──
+function updateStats(){
+  const total=products.reduce((s,p)=>s+getRem(p.barcode),0);
+  const today=new Date().toLocaleDateString('en-CA');
+  const rev=outSheet.reduce((s,o)=>s+o.price,0);
+  document.getElementById('st-p').textContent=products.length;
+  document.getElementById('st-s').textContent=total;
+  document.getElementById('st-o').textContent=outSheet.length;
+  document.getElementById('st-r').textContent=returns.length;
+  document.getElementById('st-t').textContent=outSheet.filter(o=>o.date===today).length;
+  document.getElementById('st-rev').textContent='Rs. '+rev.toLocaleString();
+}
+
+function setDates(){
+  const today=new Date().toLocaleDateString('en-CA');
+  const m=new Date();m.setDate(1);const ms=m.toLocaleDateString('en-CA');
+  ['of','rf'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=ms;});
+  ['ot','rt'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=today;});
+}
+
+function exportStockCSV(){
+  const h=['Brand','Barcode','Product','Category','Price','Opening','Restocked','Returns','Out','Remaining','Status'];
+  const rows=products.map(p=>{
+    const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
+    const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
+    const out=outSheet.filter(o=>o.barcode===p.barcode).length;
+    const rem=p.opening+rs+ret-out;
+    return[p.brand,p.barcode,p.name,p.cat,p.price,p.opening,rs,ret,out,rem,rem<=0?'Out':rem<=(p.minStock||5)?'Low':'OK'].map(v=>'"'+v+'"').join(',');
+  });
+  dl([h.join(','),...rows].join('\n'),'Stock.csv');
+}
+
+function exportOutCSV(){
+  const list=getFiltOut();
+  const h=['Date','Time','Order','Customer','Brand','Barcode','Product','Category','Price','By'];
+  const rows=list.map(o=>[o.date,o.time,o.order,o.customer||'',o.brand,o.barcode,o.name,o.cat,o.price,o.by||''].map(v=>'"'+v+'"').join(','));
+  dl([h.join(','),...rows].join('\n'),'Out_Sheet.csv');
+}
+
+function exportReplCSV(){
+  const th=parseInt(document.getElementById('rp-th').value)||5;
+  const brand=document.getElementById('rp-br').value;
+  const list=products.filter(p=>{if(brand&&p.brand!==brand) return false;return getRem(p.barcode)<=(p.minStock||th);});
+  const h=['Brand','Barcode','Product','Category','Remaining','Min Stock','Need'];
+  const rows=list.map(p=>{const rem=getRem(p.barcode);return[p.brand,p.barcode,p.name,p.cat,rem,p.minStock||5,Math.max(0,(p.minStock||5)*3-rem)].map(v=>'"'+v+'"').join(',');});
+  dl([h.join(','),...rows].join('\n'),'Replenishment.csv');
+}
+
+function exportRepCSV(){
+  const t=document.getElementById('rep-tbl');
+  const rows=[];t.querySelectorAll('tr').forEach(tr=>{rows.push([...tr.querySelectorAll('th,td')].map(c=>'"'+c.textContent.trim()+'"').join(','));});
+  dl(rows.join('\n'),'Report.csv');
+}
+
+function dl(csv,fn){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn;a.click();}
+
+function updateClock(){const e=document.getElementById('clock');if(e) e.textContent=new Date().toLocaleString('en-PK',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
+updateClock();setInterval(updateClock,60000);
+</script>
+</body>
+</html>
