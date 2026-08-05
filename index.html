@@ -102,13 +102,6 @@ tr:hover td{background:#FFF9F9}
 .ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px;border-top:1px solid #F0F0F0}
 .ai-sug{padding:4px 10px;background:#F0F0F0;border:none;border-radius:20px;font-size:10px;cursor:pointer;color:#555}
 .ai-sug:hover{background:#8B0000;color:#fff}
-/* REPL REPORT */
-.repl-card{border:2px solid #E74C3C;border-radius:8px;padding:14px;background:#FFF9F9;margin-bottom:10px}
-.repl-card.ok{border-color:#2D6A4F;background:#F0FFF4}
-.repl-card.warn{border-color:#C9A84C;background:#FFF9F0}
-.brand-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-right:6px}
-.brand-m{background:#FADBD8;color:#8B0000}
-.brand-r{background:#D6EAF8;color:#185FA5}
 /* USER CARD */
 .ucard{background:#FAFAFA;border:1px solid #EEE;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .uavatar{width:34px;height:34px;border-radius:50%;background:#8B0000;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
@@ -489,15 +482,39 @@ tr:hover td{background:#FFF9F9}
   <button class="ai-toggle" onclick="toggleAI()">🤖</button>
 </div>
 
+<!-- FIREBASE SDKS -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "npire-ecom-inventory.firebaseapp.com",
+    projectId: "npire-ecom-inventory",
+    storageBucket: "npire-ecom-inventory.firebasestorage.app",
+    messagingSenderId: "754891014532",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Expose firebase tools globally if needed by app functions, or handle sync here
+  window.db = db;
+  window.firebaseCollection = collection;
+  window.firebaseAddDoc = addDoc;
+  window.firebaseGetDocs = getDocs;
+</script>
+
 <script>
-// ── DATA ──
-let products=JSON.parse(localStorage.getItem('sms_prod')||'[]');
-let outSheet=JSON.parse(localStorage.getItem('sms_out')||'[]');
-let restocks=JSON.parse(localStorage.getItem('sms_restock')||'[]');
-let returns=JSON.parse(localStorage.getItem('sms_returns')||'[]');
-let users=JSON.parse(localStorage.getItem('sms_users')||'[]');
-let currentUser=null;
-let currentSession=null;
+// ── DATA & APP LOGIC ──
+let products = JSON.parse(localStorage.getItem('sms_prod')||'[]');
+let outSheet = JSON.parse(localStorage.getItem('sms_out')||'[]');
+let restocks = JSON.parse(localStorage.getItem('sms_restock')||'[]');
+let returns = JSON.parse(localStorage.getItem('sms_returns')||'[]');
+let users = JSON.parse(localStorage.getItem('sms_users')||'[]');
+let currentUser = null;
+let currentSession = null;
 
 if(!users.length){
   users=[{id:'mgr001',name:'Junaid Ali',username:'manager',password:'manager123',role:'manager',access:['stock','restock','scan','return','out','repl','report','users']}];
@@ -511,683 +528,938 @@ function saveRet(){try{localStorage.setItem('sms_returns',JSON.stringify(returns
 
 // ── AUTH ──
 function login(){
-  const u=document.getElementById('lu').value.trim().toLowerCase();
-  const p=document.getElementById('lp').value.trim();
-  const user=users.find(x=>x.username.toLowerCase()===u&&x.password===p);
-  if(!user){const e=document.getElementById('lerr');e.style.display='block';setTimeout(()=>e.style.display='none',3000);return;}
-  currentUser=user;
-  document.getElementById('ls').style.display='none';
-  document.getElementById('app').style.display='block';
-  document.getElementById('ai-box').style.display='block';
-  document.getElementById('ubadge').textContent=user.name+' ('+user.role.toUpperCase()+')';
-  buildTabs();
-  const acc=currentUser.role==='manager'?['stock','restock','scan','return','out','repl','report','users']:(currentUser.access||[]);
-  switchTab(acc[0]||'scan');
-  updateStats();
+  const u = document.getElementById('lu').value.trim().toLowerCase();
+  const p = document.getElementById('lp').value.trim();
+  const user = users.find(x => x.username.toLowerCase() === u && x.password === p);
+  if(!user){
+    const err = document.getElementById('lerr');
+    err.style.display = 'block';
+    setTimeout(() => err.style.display = 'none', 3000);
+    return;
+  }
+  currentUser = user;
+  document.getElementById('ls').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('ai-box').style.display = 'block';
+  document.getElementById('ubadge').innerText = `${user.name} (${user.role.toUpperCase()})`;
+  initApp();
 }
 
 function logout(){
-  currentUser=null;currentSession=null;
-  document.getElementById('ls').style.display='flex';
-  document.getElementById('app').style.display='none';
-  document.getElementById('ai-box').style.display='none';
-  document.getElementById('lu').value='';document.getElementById('lp').value='';
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('ai-box').style.display = 'none';
+  document.getElementById('ls').style.display = 'flex';
+  document.getElementById('lu').value = '';
+  document.getElementById('lp').value = '';
 }
 
-// ── TABS ──
-const TABS=[
-  {id:'stock',label:'📦 Stock'},{id:'restock',label:'🔄 Restock'},
-  {id:'scan',label:'📷 Scan & Dispatch'},{id:'return',label:'↩️ Return/Exchange'},
-  {id:'out',label:'📄 Out Sheet'},{id:'repl',label:'🔔 Replenishment'},
-  {id:'report',label:'📊 Reports'},{id:'users',label:'👥 Users'},
+function initApp(){
+  buildTabs();
+  updateStats();
+  renderStock();
+  populateRestockSelect();
+  renderRestockHistory();
+  renderReturns();
+  renderOut();
+  renderUsersList();
+  setDefAccess();
+  
+  // Clock ticker
+  setInterval(() => {
+    const d = new Date();
+    const c = document.getElementById('clock');
+    if(c) c.innerText = d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+  }, 1000);
+}
+
+// ── NAVIGATION & TABS ──
+const allTabs = [
+  {id:'stock', name:'📦 Stock', perm:'stock'},
+  {id:'restock', name:'🔄 Restock', perm:'restock'},
+  {id:'scan', name:'📷 Scan & Dispatch', perm:'scan'},
+  {id:'return', name:'↩️ Returns', perm:'return'},
+  {id:'out', name:'📄 Out Sheet', perm:'out'},
+  {id:'repl', name:'🔔 Replenishment', perm:'repl'},
+  {id:'report', name:'📊 Reports', perm:'report'},
+  {id:'users', name:'👥 Users', perm:'manager'}
 ];
 
 function buildTabs(){
-  const acc=currentUser.role==='manager'?['stock','restock','scan','return','out','repl','report','users']:(currentUser.access||[]);
-  document.getElementById('tabs').innerHTML=TABS.filter(t=>acc.includes(t.id)).map(t=>`<button class="tab" onclick="switchTab('${t.id}')" id="tab-${t.id}">${t.label}</button>`).join('');
+  const tbar = document.getElementById('tabs');
+  tbar.innerHTML = '';
+  const available = allTabs.filter(t => currentUser.role === 'manager' || currentUser.access.includes(t.perm));
+  available.forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.className = `tab ${i===0?'active':''}`;
+    btn.innerText = t.name;
+    btn.onclick = () => switchPage(t.id, btn);
+    tbar.appendChild(btn);
+  });
+  if(available.length > 0) switchPage(available[0].id);
 }
 
-function switchTab(id){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  const tb=document.getElementById('tab-'+id);if(tb) tb.classList.add('active');
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  const pg=document.getElementById('pg-'+id);if(pg) pg.classList.add('active');
-  if(id==='stock'){renderStock();populateRestockSelect();}
-  if(id==='restock'){populateRestockSelect();renderRestocks();}
-  if(id==='scan') renderQuick();
-  if(id==='return') renderReturns();
-  if(id==='out'){setDates();renderOut();}
-  if(id==='repl') renderRepl();
-  if(id==='report') setDates();
-  if(id==='users') renderUsers();
-  updateStats();
+function switchPage(pageId, btnEl){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+  const target = document.getElementById('pg-' + pageId);
+  if(target) target.classList.add('active');
+  if(btnEl) btnEl.classList.add('active');
 }
 
-// ── HELPERS ──
-function getRem(bc){
-  const p=products.find(x=>x.barcode===bc);if(!p) return 0;
-  const addedRestock=restocks.filter(r=>r.barcode===bc).reduce((s,r)=>s+r.qty,0);
-  const addedReturns=returns.filter(r=>r.barcode===bc&&r.stockBack).length;
-  const out=outSheet.filter(o=>o.barcode===bc).length;
-  return p.opening+addedRestock+addedReturns-out;
+// ── STATS UPDATE ──
+function updateStats(){
+  let totalStock = 0, totalOut = 0, totalReturns = returns.length, todayOut = 0, totalRev = 0;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  products.forEach(p => {
+    totalStock += (Number(p.opening||0) + Number(p.restocked||0) + Number(p.returns||0) - Number(p.out||0));
+    totalOut += Number(p.out||0);
+  });
+
+  outSheet.forEach(o => {
+    totalRev += Number(o.price||0);
+    if(o.date === todayStr) todayOut++;
+  });
+
+  document.getElementById('st-p').innerText = products.length;
+  document.getElementById('st-s').innerText = totalStock;
+  document.getElementById('st-o').innerText = totalOut;
+  document.getElementById('st-r').innerText = totalReturns;
+  document.getElementById('st-t').innerText = todayOut;
+  document.getElementById('st-rev').innerText = 'Rs. ' + totalRev.toLocaleString();
 }
 
-function getStatus(rem,min=5){
-  if(rem<=0) return '<span class="badge b-out">Out of Stock</span>';
-  if(rem<=min) return '<span class="badge b-low">Low Stock</span>';
-  return '<span class="badge b-in">In Stock</span>';
-}
-
-function now(){
-  const d=new Date();
-  return{date:d.toLocaleDateString('en-CA'),time:d.toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'}),
-  full:d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'})};
-}
-
-function fmtDate(d){if(!d) return '';return new Date(d+'T00:00:00').toLocaleDateString('en-PK',{day:'2-digit',month:'short',year:'numeric'});}
-function fmtPKR(n){return 'Rs. '+Number(n).toLocaleString();}
-
-// ── STOCK ──
+// ── STOCK MANAGEMENT ──
 function addProduct(){
-  const brand=document.getElementById('p-brand').value;
-  const bc=document.getElementById('p-bc').value.trim().toUpperCase();
-  const nm=document.getElementById('p-nm').value.trim();
-  const cat=document.getElementById('p-cat').value;
-  const pr=parseInt(document.getElementById('p-pr').value)||0;
-  const st=parseInt(document.getElementById('p-st').value)||0;
-  const min=parseInt(document.getElementById('p-min').value)||5;
-  if(!bc||!nm||!pr||!st){alert('Fill all required fields!');return;}
-  if(products.find(p=>p.barcode===bc)){alert('Barcode exists!');return;}
-  products.push({barcode:bc,brand,name:nm,cat,price:pr,opening:st,minStock:min});
-  save();renderStock();updateStats();populateRestockSelect();
-  ['p-bc','p-nm','p-pr','p-st'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('p-min').value='5';
-}
+  const brand = document.getElementById('p-brand').value;
+  const bc = document.getElementById('p-bc').value.trim();
+  const nm = document.getElementById('p-nm').value.trim();
+  const cat = document.getElementById('p-cat').value;
+  const pr = Number(document.getElementById('p-pr').value);
+  const st = Number(document.getElementById('p-st').value);
+  const min = Number(document.getElementById('p-min').value);
 
-function deleteProduct(bc){
-  if(currentUser.role!=='manager'){alert('Manager only!');return;}
-  if(!confirm('Remove product?')) return;
-  products=products.filter(p=>p.barcode!==bc);save();renderStock();updateStats();
+  if(!bc || !nm || isNaN(pr) || isNaN(st)){
+    alert('Please fill in all required product fields correctly.');
+    return;
+  }
+  if(products.some(p => p.barcode === bc)){
+    alert('A product with this barcode already exists!');
+    return;
+  }
+
+  products.push({
+    brand, barcode: bc, name: nm, category: cat, price: pr,
+    opening: st, restocked: 0, returns: 0, out: 0, minAlert: min
+  });
+
+  save();
+  updateStats();
+  renderStock();
+  populateRestockSelect();
+
+  document.getElementById('p-bc').value = '';
+  document.getElementById('p-nm').value = '';
+  document.getElementById('p-pr').value = '';
+  document.getElementById('p-st').value = '';
+  alert('Product successfully added to stock!');
 }
 
 function renderStock(){
-  const q=(document.getElementById('sb-q')?.value||'').toLowerCase();
-  const brand=document.getElementById('sb-brand')?.value||'';
-  const cat=document.getElementById('sb-cat')?.value||'';
-  const isMgr=currentUser?.role==='manager';
-  if(isMgr) document.getElementById('sath').textContent='Action';
-  const list=products.filter(p=>{
-    if(brand&&p.brand!==brand) return false;
-    if(cat&&p.cat!==cat) return false;
-    if(q&&!(p.barcode.toLowerCase().includes(q)||p.name.toLowerCase().includes(q))) return false;
+  const brandF = document.getElementById('sb-brand').value;
+  const catF = document.getElementById('sb-cat').value;
+  const qF = document.getElementById('sb-q').value.toLowerCase();
+  const stb = document.getElementById('stb');
+  const qtb = document.getElementById('qtb');
+  stb.innerHTML = '';
+  qtb.innerHTML = '';
+
+  const isMgr = currentUser.role === 'manager';
+  document.getElementById('sath').innerHTML = isMgr ? 'Action' : '';
+
+  const filtered = products.filter(p => {
+    if(brandF && p.brand !== brandF) return false;
+    if(catF && p.category !== catF) return false;
+    if(qF && !p.name.toLowerCase().includes(qF) && !p.barcode.toLowerCase().includes(qF)) return false;
     return true;
   });
-  const tbody=document.getElementById('stb');
-  if(!list.length){tbody.innerHTML='<tr><td colspan="12" class="empty">No products. Add products above.</td></tr>';return;}
-  tbody.innerHTML=list.map(p=>{
-    const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
-    const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
-    const out=outSheet.filter(o=>o.barcode===p.barcode).length;
-    const rem=p.opening+rs+ret-out;
-    const brandColor=p.brand==='Mantashani'?'brand-m':'brand-r';
-    return `<tr>
-      <td><span class="brand-tag ${brandColor}">${p.brand}</span></td>
-      <td class="oid">${p.barcode}</td>
-      <td style="font-weight:500">${p.name}</td>
-      <td style="color:#666;font-size:11px">${p.cat}</td>
-      <td class="price">${fmtPKR(p.price)}</td>
-      <td style="text-align:center;font-weight:600">${p.opening}</td>
-      <td style="text-align:center;color:#2D6A4F;font-weight:600">${rs}</td>
-      <td style="text-align:center;color:#8E44AD;font-weight:600">${ret}</td>
-      <td style="text-align:center;color:#A32D2D;font-weight:600">${out}</td>
-      <td style="text-align:center;font-size:18px;font-weight:700;color:${rem<=0?'#A32D2D':rem<=(p.minStock||5)?'#854F0B':'#155724'}">${rem}</td>
-      <td>${getStatus(rem,p.minStock||5)}</td>
-      <td>${isMgr?`<button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.barcode}')">Del</button>`:''}</td>
-    </tr>`;
-  }).join('');
+
+  if(!filtered.length){
+    stb.innerHTML = `<tr><td colspan="12" class="empty">No products found.</td></tr>`;
+    qtb.innerHTML = `<tr><td colspan="6" class="empty">No products found.</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(p => {
+    const rem = Number(p.opening) + Number(p.restocked) + Number(p.returns) - Number(p.out);
+    let statusBadge = `<span class="badge b-in">In Stock</span>`;
+    if(rem <= 0) statusBadge = `<span class="badge b-out">Out of Stock</span>`;
+    else if(rem <= (p.minAlert || 5)) statusBadge = `<span class="badge b-low">Low Stock</span>`;
+
+    // Main stock row
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.brand}</td>
+      <td><span class="oid">${p.barcode}</span></td>
+      <td><b>${p.name}</b></td>
+      <td>${p.category}</td>
+      <td class="price">Rs. ${Number(p.price).toLocaleString()}</td>
+      <td>${p.opening}</td>
+      <td>${p.restocked}</td>
+      <td>${p.returns}</td>
+      <td>${p.out}</td>
+      <td><b>${rem}</b></td>
+      <td>${statusBadge}</td>
+      <td>${isMgr ? `<button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.barcode}')">Delete</button>` : ''}</td>
+    `;
+    stb.appendChild(tr);
+
+    // Quick stock row (for scan page)
+    const qtr = document.createElement('tr');
+    qtr.innerHTML = `
+      <td>${p.brand}</td>
+      <td><span class="oid">${p.barcode}</span></td>
+      <td><b>${p.name}</b></td>
+      <td>${p.category}</td>
+      <td><b>${rem}</b></td>
+      <td>${statusBadge}</td>
+    `;
+    qtb.appendChild(qtr);
+  });
+}
+
+function deleteProduct(bc){
+  if(!confirm('Are you sure you want to delete this product?')) return;
+  products = products.filter(p => p.barcode !== bc);
+  save();
+  updateStats();
+  renderStock();
+  populateRestockSelect();
+}
+
+function exportStockCSV(){
+  let csv = 'Brand,Barcode,Product Name,Category,Price,Opening,Restocked,Returns,Out,Remaining\n';
+  products.forEach(p => {
+    const rem = Number(p.opening) + Number(p.restocked) + Number(p.returns) - Number(p.out);
+    csv += `"${p.brand}","${p.barcode}","${p.name}","${p.category}",${p.price},${p.opening},${p.restocked},${p.returns},${p.out},${rem}\n`;
+  });
+  downloadCSV(csv, 'stock_inventory.csv');
 }
 
 // ── RESTOCK ──
 function populateRestockSelect(){
-  const sel=document.getElementById('rs-bc');
-  if(!sel) return;
-  sel.innerHTML='<option value="">-- Select Product --</option>'+products.map(p=>`<option value="${p.barcode}">[${p.brand}] ${p.name} (${p.barcode}) — Stock: ${getRem(p.barcode)}</option>`).join('');
+  const sel = document.getElementById('rs-bc');
+  sel.innerHTML = '<option value="">-- Select Product --</option>';
+  products.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.barcode;
+    opt.innerText = `${p.name} (${p.barcode}) - Rem: ${Number(p.opening)+Number(p.restocked)+Number(p.returns)-Number(p.out)}`;
+    sel.appendChild(opt);
+  });
 }
 
 function restockProduct(){
-  const bc=document.getElementById('rs-bc').value;
-  const qty=parseInt(document.getElementById('rs-qty').value)||0;
-  const note=document.getElementById('rs-note').value.trim();
-  if(!bc||!qty){alert('Select product and enter quantity!');return;}
-  const prod=products.find(p=>p.barcode===bc);
-  const n=now();
-  restocks.push({date:n.date,time:n.time,barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,qty,note,by:currentUser.name});
-  saveRest();renderRestocks();renderStock();updateStats();populateRestockSelect();
-  document.getElementById('rs-qty').value='';document.getElementById('rs-note').value='';
-  alert(`✅ Restocked ${qty} units of "${prod.name}"`);
+  const bc = document.getElementById('rs-bc').value;
+  const qty = Number(document.getElementById('rs-qty').value);
+  const note = document.getElementById('rs-note').value.trim();
+
+  if(!bc || isNaN(qty) || qty <= 0){
+    alert('Please select a valid product and enter a positive quantity.');
+    return;
+  }
+
+  const prod = products.find(p => p.barcode === bc);
+  if(!prod){
+    alert('Product not found.');
+    return;
+  }
+
+  prod.restocked = Number(prod.restocked || 0) + qty;
+  restocks.unshift({
+    date: new Date().toISOString().split('T')[0],
+    brand: prod.brand,
+    product: prod.name,
+    category: prod.category,
+    qty,
+    note,
+    user: currentUser.name
+  });
+
+  save();
+  saveRest();
+  updateStats();
+  renderStock();
+  populateRestockSelect();
+
+  document.getElementById('rs-bc').value = '';
+  document.getElementById('rs-qty').value = '';
+  document.getElementById('rs-note').value = '';
+  alert('Restock successfully logged!');
 }
 
-function renderRestocks(){
-  const tbody=document.getElementById('rstb');
-  if(!restocks.length){tbody.innerHTML='<tr><td colspan="7" class="empty">No restock history.</td></tr>';return;}
-  tbody.innerHTML=[...restocks].reverse().map(r=>`
-    <tr>
-      <td style="font-size:11px;color:#666">${fmtDate(r.date)}</td>
-      <td><span class="brand-tag ${r.brand==='Mantashani'?'brand-m':'brand-r'}">${r.brand}</span></td>
-      <td style="font-weight:500">${r.name}</td>
-      <td style="font-size:11px;color:#666">${r.cat}</td>
-      <td style="text-align:center;font-weight:700;color:#2D6A4F;font-size:16px">+${r.qty}</td>
-      <td style="font-size:11px;color:#666">${r.note||'-'}</td>
-      <td style="font-size:11px;color:#888">${r.by}</td>
-    </tr>`).join('');
+function renderRestockHistory(){
+  const tbody = document.getElementById('rstb');
+  tbody.innerHTML = '';
+  if(!restocks.length){
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No restock history available.</td></tr>`;
+    return;
+  }
+  restocks.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td>${r.brand}</td>
+      <td><b>${r.product}</b></td>
+      <td>${r.category}</td>
+      <td><span style="color:#2D6A4F;font-weight:600">+${r.qty}</span></td>
+      <td>${r.note || '-'}</td>
+      <td>${r.user}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-// ── SCAN SESSION ──
+// ── SCAN & DISPATCH SESSIONS ──
 function startSession(){
-  const ord=document.getElementById('ord-num').value.trim();
-  if(!ord){alert('Enter Order Number first!');return;}
-  if(outSheet.find(o=>o.order===ord)){if(!confirm(`Order ${ord} already has items. Continue adding?`)) return;}
-  currentSession={order:ord,customer:document.getElementById('ord-cust').value.trim(),items:[],startTime:now().full};
-  document.getElementById('no-session').style.display='none';
-  document.getElementById('active-session').style.display='block';
-  document.getElementById('sess-badge').textContent='🟢 Active: '+ord;
-  document.getElementById('sess-badge').className='session-badge active';
+  const ordNum = document.getElementById('ord-num').value.trim();
+  const custName = document.getElementById('ord-cust').value.trim();
+
+  if(!ordNum){
+    showAlert('scan-alert', 'Please enter an Order Number before starting.', 'e');
+    return;
+  }
+
+  currentSession = {
+    orderNumber: ordNum,
+    customer: custName || 'Walk-in / Online',
+    items: []
+  };
+
+  document.getElementById('no-session').style.display = 'none';
+  document.getElementById('active-session').style.display = 'block';
+  document.getElementById('ord-num').disabled = true;
+  document.getElementById('ord-cust').disabled = true;
+  document.getElementById('sess-badge').innerText = `Active: ${ordNum}`;
+  document.getElementById('sess-badge').className = 'session-badge active';
   document.getElementById('scan-input').focus();
-  renderSession();
+  renderSessionItems();
 }
 
 function scanBarcode(){
-  const bc=document.getElementById('scan-input').value.trim().toUpperCase();
-  const alertEl=document.getElementById('scan-alert');
+  const bcInput = document.getElementById('scan-input');
+  const bc = bcInput.value.trim();
   if(!bc) return;
-  const prod=products.find(p=>p.barcode===bc);
+
+  const prod = products.find(p => p.barcode.toLowerCase() === bc.toLowerCase());
   if(!prod){
-    alertEl.className='alert e';alertEl.textContent=`❌ Barcode "${bc}" not found in stock!`;alertEl.style.display='block';
-    setTimeout(()=>alertEl.style.display='none',3000);
-    document.getElementById('scan-input').value='';return;
+    showAlert('scan-alert', `Barcode "${bc}" not found in inventory!`, 'e');
+    bcInput.value = '';
+    return;
   }
-  const sessionOut=currentSession.items.filter(i=>i.barcode===bc).length;
-  const totalOut=outSheet.filter(o=>o.barcode===bc).length;
-  const rem=getRem(bc)-sessionOut;
-  if(rem<=0){
-    alertEl.className='alert e';alertEl.textContent=`❌ Out of stock! "${prod.name}" = 0 remaining.`;alertEl.style.display='block';
-    setTimeout(()=>alertEl.style.display='none',3000);
-    document.getElementById('scan-input').value='';return;
+
+  const rem = Number(prod.opening) + Number(prod.restocked) + Number(prod.returns) - Number(prod.out);
+  if(rem <= 0){
+    showAlert('scan-alert', `Product "${prod.name}" is OUT OF STOCK!`, 'e');
+    bcInput.value = '';
+    return;
   }
-  currentSession.items.push({barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,price:prod.price,scanTime:now().time});
-  alertEl.className='alert s';alertEl.textContent=`✅ Scanned: ${prod.name} | Remaining: ${rem-1}`;alertEl.style.display='block';
-  setTimeout(()=>alertEl.style.display='none',2000);
-  document.getElementById('scan-input').value='';
-  document.getElementById('scan-input').focus();
-  renderSession();
+
+  currentSession.items.push(prod);
+  bcInput.value = '';
+  hideAlert('scan-alert');
+  renderSessionItems();
 }
 
-document.addEventListener('keydown',e=>{
-  const si=document.getElementById('scan-input');
-  if(e.key==='Enter'&&si&&si===document.activeElement) scanBarcode();
-});
+function renderSessionItems(){
+  const container = document.getElementById('scanned-list');
+  const summaryBox = document.getElementById('sess-summary');
+  container.innerHTML = '';
 
-function removeSessionItem(idx){
-  currentSession.items.splice(idx,1);renderSession();
-}
-
-function renderSession(){
-  const list=document.getElementById('scanned-list');
-  const sumDiv=document.getElementById('sess-summary');
-  if(!currentSession||!currentSession.items.length){
-    list.innerHTML='<div class="empty">No items scanned yet.</div>';
-    sumDiv.style.display='none';return;
+  if(!currentSession.items.length){
+    container.innerHTML = `<div class="empty">No items scanned yet. Scan first item above.</div>`;
+    summaryBox.style.display = 'none';
+    return;
   }
-  sumDiv.style.display='block';
-  const total=currentSession.items.reduce((s,i)=>s+i.price,0);
-  document.getElementById('sess-items').textContent=currentSession.items.length;
-  document.getElementById('sess-total').textContent=fmtPKR(total);
-  // Group by barcode for display
-  const grouped={};
-  currentSession.items.forEach((item,idx)=>{
-    const key=item.barcode;
-    if(!grouped[key]) grouped[key]={...item,qty:0,indices:[]};
-    grouped[key].qty++;grouped[key].indices.push(idx);
-  });
-  list.innerHTML=Object.values(grouped).map(g=>`
-    <div class="scanned-item">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${g.brand}</span>
-        <div>
-          <div style="font-size:12px;font-weight:600">${g.name}</div>
-          <div style="font-size:10px;color:#888">${g.barcode} | ${g.cat}</div>
-        </div>
+
+  summaryBox.style.display = 'block';
+  let totalAmt = 0;
+
+  currentSession.items.forEach((item, idx) => {
+    totalAmt += Number(item.price);
+    const div = document.createElement('div');
+    div.className = 'scanned-item';
+    div.innerHTML = `
+      <div>
+        <span class="brand-tag ${item.brand==='Mantashani'?'brand-m':'brand-r'}">${item.brand}</span>
+        <b>${item.name}</b> <span class="oid">(${item.barcode})</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:13px;font-weight:700;color:#8B0000">×${g.qty}</span>
-        <span class="price">${fmtPKR(g.price*g.qty)}</span>
-        <button class="btn btn-danger btn-sm" onclick="removeSessionItem(${g.indices[g.indices.length-1]})">-1</button>
+        <span class="price">Rs. ${Number(item.price).toLocaleString()}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeScannedItem(${idx})">✕</button>
       </div>
-    </div>`).join('');
+    `;
+    container.appendChild(div);
+  });
+
+  document.getElementById('sess-items').innerText = currentSession.items.length;
+  document.getElementById('sess-total').innerText = 'Rs. ' + totalAmt.toLocaleString();
+}
+
+function removeScannedItem(idx){
+  currentSession.items.splice(idx, 1);
+  renderSessionItems();
 }
 
 function closeOrder(){
-  if(!currentSession||!currentSession.items.length){alert('No items scanned!');return;}
-  const n=now();
-  currentSession.items.forEach(item=>{
-    outSheet.push({date:n.date,time:n.time,order:currentSession.order,customer:currentSession.customer,
-    barcode:item.barcode,name:item.name,brand:item.brand,cat:item.cat,price:item.price,by:currentUser.name});
+  if(!currentSession || !currentSession.items.length){
+    showAlert('scan-alert', 'Cannot dispatch empty order.', 'e');
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const timeStr = now.toLocaleTimeString();
+
+  currentSession.items.forEach(item => {
+    const prod = products.find(p => p.barcode === item.barcode);
+    if(prod){
+      prod.out = Number(prod.out || 0) + 1;
+    }
+    outSheet.unshift({
+      date: dateStr,
+      time: timeStr,
+      orderNumber: currentSession.orderNumber,
+      customer: currentSession.customer,
+      brand: item.brand,
+      barcode: item.barcode,
+      product: item.name,
+      category: item.category,
+      price: item.price,
+      user: currentUser.name
+    });
   });
+
   save();
-  const total=currentSession.items.reduce((s,i)=>s+i.price,0);
-  alert(`✅ Order ${currentSession.order} closed!\n${currentSession.items.length} items dispatched\nTotal: ${fmtPKR(total)}`);
-  resetSession();updateStats();renderQuick();
+  updateStats();
+  renderStock();
+
+  showAlert('scan-alert', `Order ${currentSession.orderNumber} successfully dispatched!`, 's');
+  cancelSession();
 }
 
 function cancelSession(){
-  if(!confirm('Cancel this order? All scanned items will be removed.')) return;
-  resetSession();
+  currentSession = null;
+  document.getElementById('no-session').style.display = 'block';
+  document.getElementById('active-session').style.display = 'none';
+  document.getElementById('ord-num').disabled = false;
+  document.getElementById('ord-cust').disabled = false;
+  document.getElementById('ord-num').value = '';
+  document.getElementById('ord-cust').value = '';
+  document.getElementById('sess-badge').innerText = 'No Active Order';
+  document.getElementById('sess-badge').className = 'session-badge';
+  document.getElementById('sess-summary').style.display = 'none';
+  document.getElementById('scanned-list').innerHTML = `<div class="empty">No items scanned yet. Scan first item above.</div>`;
 }
 
-function resetSession(){
-  currentSession=null;
-  document.getElementById('no-session').style.display='block';
-  document.getElementById('active-session').style.display='none';
-  document.getElementById('sess-badge').textContent='No Active Order';
-  document.getElementById('sess-badge').className='session-badge';
-  document.getElementById('ord-num').value='';document.getElementById('ord-cust').value='';
-  document.getElementById('scanned-list').innerHTML='<div class="empty">No items scanned yet.</div>';
-  document.getElementById('sess-summary').style.display='none';
-  document.getElementById('scan-alert').style.display='none';
-}
-
-function renderQuick(){
-  const tbody=document.getElementById('qtb');
-  if(!products.length){tbody.innerHTML='<tr><td colspan="6" class="empty">No products yet.</td></tr>';return;}
-  tbody.innerHTML=products.map(p=>{
-    const rem=getRem(p.barcode);
-    return `<tr>
-      <td><span class="brand-tag ${p.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${p.brand}</span></td>
-      <td class="oid" style="font-size:10px">${p.barcode}</td>
-      <td style="font-size:11px;font-weight:500">${p.name}</td>
-      <td style="font-size:11px;color:#666">${p.cat}</td>
-      <td style="text-align:center;font-weight:700;font-size:16px;color:${rem<=0?'#A32D2D':rem<=(p.minStock||5)?'#854F0B':'#155724'}">${rem}</td>
-      <td>${getStatus(rem,p.minStock||5)}</td>
-    </tr>`;
-  }).join('');
-}
-
-// ── RETURNS ──
-function processReturn(){
-  const bc=document.getElementById('ret-bc').value.trim().toUpperCase();
-  const ord=document.getElementById('ret-ord').value.trim();
-  const type=document.getElementById('ret-type').value;
-  const reason=document.getElementById('ret-reason').value;
-  const newBc=document.getElementById('ret-new-bc').value.trim().toUpperCase();
-  const note=document.getElementById('ret-note').value.trim();
-  const alertEl=document.getElementById('ret-alert');
-  if(!bc){alertEl.className='alert e';alertEl.textContent='Enter barcode!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
-  const prod=products.find(p=>p.barcode===bc);
-  if(!prod){alertEl.className='alert e';alertEl.textContent=`Product "${bc}" not found!`;alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
-  const stockBack=type==='return'||type==='exchange';
-  const n=now();
-  returns.push({date:n.date,time:n.time,order:ord||'-',barcode:bc,name:prod.name,brand:prod.brand,cat:prod.cat,price:prod.price,type,reason,note,stockBack,by:currentUser.name});
-  if(type==='exchange'&&newBc){
-    const newProd=products.find(p=>p.barcode===newBc);
-    if(newProd){
-      const remNew=getRem(newBc);
-      if(remNew>0){
-        outSheet.push({date:n.date,time:n.time,order:ord||'EXCHANGE',customer:'Exchange',barcode:newBc,name:newProd.name,brand:newProd.brand,cat:newProd.cat,price:newProd.price,by:currentUser.name});
-        save();
-      }
-    }
+// Attach barcode input listener
+document.addEventListener('DOMContentLoaded', () => {
+  const scanIn = document.getElementById('scan-input');
+  if(scanIn){
+    scanIn.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') scanBarcode();
+    });
   }
-  saveRet();renderReturns();renderStock();updateStats();
-  alertEl.className='alert s';alertEl.textContent=`✅ ${type==='return'?'Return':'Exchange'} processed for "${prod.name}"${stockBack?' — Stock added back!':' — No stock returned (damaged).'}`;alertEl.style.display='block';
-  setTimeout(()=>alertEl.style.display='none',4000);
-  ['ret-bc','ret-ord','ret-new-bc','ret-note'].forEach(id=>document.getElementById(id).value='');
+});
+
+// ── RETURNS & EXCHANGES ──
+function processReturn(){
+  const ord = document.getElementById('ret-ord').value.trim();
+  const bc = document.getElementById('ret-bc').value.trim();
+  const type = document.getElementById('ret-type').value;
+  const reason = document.getElementById('ret-reason').value;
+  const newBc = document.getElementById('ret-new-bc').value.trim();
+  const note = document.getElementById('ret-note').value.trim();
+
+  if(!bc){
+    showAlert('ret-alert', 'Please enter or scan the product barcode.', 'e');
+    return;
+  }
+
+  const prod = products.find(p => p.barcode.toLowerCase() === bc.toLowerCase());
+  if(!prod){
+    showAlert('ret-alert', `Barcode "${bc}" not found in inventory.`, 'e');
+    return;
+  }
+
+  let stockBackAdded = false;
+  if(type === 'return' || type === 'exchange'){
+    prod.returns = Number(prod.returns || 0) + 1;
+    stockBackAdded = true;
+  }
+
+  if(type === 'exchange'){
+    if(!newBc){
+      showAlert('ret-alert', 'Please provide a New Barcode for the exchange item.', 'e');
+      return;
+    }
+    const newProd = products.find(p => p.barcode.toLowerCase() === newBc.toLowerCase());
+    if(!newProd){
+      showAlert('ret-alert', `New exchange barcode "${newBc}" not found.`, 'e');
+      return;
+    }
+    newProd.out = Number(newProd.out || 0) + 1;
+    outSheet.unshift({
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString(),
+      orderNumber: (ord || 'EXCH') + '-EXCH',
+      customer: 'Exchange Replacement',
+      brand: newProd.brand,
+      barcode: newProd.barcode,
+      product: newProd.name,
+      category: newProd.category,
+      price: newProd.price,
+      user: currentUser.name
+    });
+  }
+
+  returns.unshift({
+    date: new Date().toISOString().split('T')[0],
+    orderNumber: ord || 'N/A',
+    barcode: prod.barcode,
+    product: prod.name,
+    type,
+    reason,
+    stockBack: stockBackAdded ? 'Yes (+1)' : 'No',
+    user: currentUser.name
+  });
+
+  save();
+  saveRet();
+  updateStats();
+  renderStock();
+  renderReturns();
+
+  showAlert('ret-alert', 'Return / Exchange processed successfully!', 's');
+  document.getElementById('ret-ord').value = '';
+  document.getElementById('ret-bc').value = '';
+  document.getElementById('ret-new-bc').value = '';
+  document.getElementById('ret-note').value = '';
 }
 
 function renderReturns(){
-  const tbody=document.getElementById('rettb');
-  if(!returns.length){tbody.innerHTML='<tr><td colspan="8" class="empty">No returns yet.</td></tr>';return;}
-  tbody.innerHTML=[...returns].reverse().map(r=>`
-    <tr>
-      <td style="font-size:11px;color:#666">${fmtDate(r.date)}</td>
-      <td class="oid">${r.order}</td>
-      <td style="font-family:monospace;font-size:11px">${r.barcode}</td>
-      <td style="font-size:11px;font-weight:500">${r.name}</td>
-      <td><span class="badge ${r.type==='return'?'b-return':r.type==='exchange'?'b-low':'b-out'}">${r.type}</span></td>
-      <td style="font-size:11px;color:#666">${r.reason}</td>
-      <td><span class="badge ${r.stockBack?'b-in':'b-out'}">${r.stockBack?'Yes':'No'}</span></td>
-      <td style="font-size:11px;color:#888">${r.by}</td>
-    </tr>`).join('');
-}
-
-// ── OUT SHEET ──
-function getFiltOut(){
-  const from=document.getElementById('of')?.value||'';
-  const to=document.getElementById('ot')?.value||'';
-  const ord=(document.getElementById('oo')?.value||'').toLowerCase();
-  const brand=document.getElementById('ob')?.value||'';
-  const cat=document.getElementById('oc')?.value||'';
-  return outSheet.filter(o=>{
-    if(from&&o.date<from) return false;
-    if(to&&o.date>to) return false;
-    if(ord&&!o.order.toLowerCase().includes(ord)) return false;
-    if(brand&&o.brand!==brand) return false;
-    if(cat&&o.cat!==cat) return false;
-    return true;
+  const tbody = document.getElementById('rettb');
+  tbody.innerHTML = '';
+  if(!returns.length){
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">No return history recorded.</td></tr>`;
+    return;
+  }
+  returns.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td><span class="oid">${r.orderNumber}</span></td>
+      <td><span class="oid">${r.barcode}</span></td>
+      <td><b>${r.product}</b></td>
+      <td><span class="badge b-return">${r.type.toUpperCase()}</span></td>
+      <td>${r.reason}</td>
+      <td><b>${r.stockBack}</b></td>
+      <td>${r.user}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
 
+// ── OUT SHEET & FILTERS ──
 function renderOut(){
-  const list=getFiltOut();
-  const tbody=document.getElementById('otb');
-  const sb=document.getElementById('out-sum');
-  if(!list.length){tbody.innerHTML='<tr><td colspan="10" class="empty">No orders found.</td></tr>';document.getElementById('out-tot').textContent='';sb.style.display='none';return;}
-  const total=list.reduce((s,o)=>s+o.price,0);
-  const uO=new Set(list.map(o=>o.order)).size;
-  sb.style.display='block';
-  document.getElementById('fs-o').textContent=uO;
-  document.getElementById('fs-i').textContent=list.length;
-  document.getElementById('fs-r').textContent=fmtPKR(total);
-  tbody.innerHTML=[...list].reverse().map(o=>`
-    <tr>
-      <td style="font-size:11px;color:#666;white-space:nowrap">${fmtDate(o.date)}</td>
-      <td style="font-size:11px;color:#888">${o.time}</td>
-      <td class="oid">${o.order}</td>
-      <td style="font-size:11px">${o.customer||'-'}</td>
-      <td><span class="brand-tag ${o.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${o.brand}</span></td>
-      <td style="font-family:monospace;font-size:10px">${o.barcode}</td>
-      <td style="font-size:11px;font-weight:500">${o.name}</td>
-      <td style="font-size:10px;color:#666">${o.cat}</td>
-      <td class="price">${fmtPKR(o.price)}</td>
-      <td style="font-size:10px;color:#888">${o.by||'-'}</td>
-    </tr>`).join('');
-  document.getElementById('out-tot').textContent=`${list.length} items | Orders: ${uO} | Revenue: ${fmtPKR(total)}`;
+  const fFrom = document.getElementById('of').value;
+  const fTo = document.getElementById('ot').value;
+  const fOrd = document.getElementById('oo').value.toLowerCase();
+  const fBr = document.getElementById('ob').value;
+  const fCat = document.getElementById('oc').value;
+
+  const tbody = document.getElementById('otb');
+  tbody.innerHTML = '';
+
+  const filtered = outSheet.filter(o => {
+    if(fFrom && o.date < fFrom) return false;
+    if(fTo && o.date > fTo) return false;
+    if(fOrd && !o.orderNumber.toLowerCase().includes(fOrd) && !o.customer.toLowerCase().includes(fOrd)) return false;
+    if(fBr && o.brand !== fBr) return false;
+    if(fCat && o.category !== fCat) return false;
+    return true;
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">No dispatched orders match filter criteria.</td></tr>`;
+    document.getElementById('out-sum').style.display = 'none';
+    document.getElementById('out-tot').innerText = '';
+    return;
+  }
+
+  let totalRev = 0;
+  const uniqueOrders = new Set();
+  filtered.forEach(o => {
+    totalRev += Number(o.price);
+    uniqueOrders.add(o.orderNumber);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${o.date}</td>
+      <td>${o.time || ''}</td>
+      <td><span class="oid">${o.orderNumber}</span></td>
+      <td>${o.customer}</td>
+      <td>${o.brand}</td>
+      <td><span class="oid">${o.barcode}</span></td>
+      <td><b>${o.product}</b></td>
+      <td>${o.category}</td>
+      <td class="price">Rs. ${Number(o.price).toLocaleString()}</td>
+      <td>${o.user}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('fs-o').innerText = uniqueOrders.size;
+  document.getElementById('fs-i').innerText = filtered.length;
+  document.getElementById('fs-r').innerText = 'Rs. ' + totalRev.toLocaleString();
+  document.getElementById('out-sum').style.display = 'block';
+  document.getElementById('out-tot').innerText = `Total Revenue: Rs. ${totalRev.toLocaleString()}`;
 }
 
 function clearOf(){
-  ['of','ot','oo'].forEach(id=>document.getElementById(id).value='');
-  ['ob','oc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('of').value = '';
+  document.getElementById('ot').value = '';
+  document.getElementById('oo').value = '';
+  document.getElementById('ob').value = '';
+  document.getElementById('oc').value = '';
   renderOut();
 }
 
-// ── REPLENISHMENT ──
-function renderRepl(){
-  const brand=document.getElementById('rp-br').value;
-  const th=parseInt(document.getElementById('rp-th').value)||5;
-  const list=products.filter(p=>{
-    if(brand&&p.brand!==brand) return false;
-    return getRem(p.barcode)<=(p.minStock||th);
+function exportOutCSV(){
+  let csv = 'Date,Time,Order Number,Customer,Brand,Barcode,Product,Category,Price,Dispatched By\n';
+  outSheet.forEach(o => {
+    csv += `"${o.date}","${o.time || ''}","${o.orderNumber}","${o.customer}","${o.brand}","${o.barcode}","${o.product}","${o.category}",${o.price},"${o.user}"\n`;
   });
-  const content=document.getElementById('repl-content');
-  if(!list.length){content.innerHTML='<div style="text-align:center;padding:30px;color:#2D6A4F;font-weight:600">✅ All products are sufficiently stocked!</div>';return;}
-  // Group by brand and category
-  const byBrandCat={};
-  list.forEach(p=>{
-    const key=p.brand+'||'+p.cat;
-    if(!byBrandCat[key]) byBrandCat[key]={brand:p.brand,cat:p.cat,items:[]};
-    byBrandCat[key].items.push(p);
-  });
-  content.innerHTML=`
-    <div style="background:#FADBD8;border:1px solid #E74C3C;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#A32D2D;font-weight:600">
-      ⚠️ ${list.length} product(s) need replenishment!
-    </div>`+
-  Object.values(byBrandCat).map(g=>`
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}">${g.brand}</span>
-        <span style="font-size:12px;font-weight:600;color:#333">${g.cat}</span>
-      </div>
-      <div class="tw">
-        <table>
-          <thead><tr><th>Barcode</th><th>Product</th><th>Opening</th><th>Restocked</th><th>Returns</th><th>Out</th><th>Remaining</th><th>Min Stock</th><th>Need</th></tr></thead>
-          <tbody>
-            ${g.items.map(p=>{
-              const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
-              const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
-              const out=outSheet.filter(o=>o.barcode===p.barcode).length;
-              const rem=p.opening+rs+ret-out;
-              const need=Math.max(0,(p.minStock||5)*3-rem);
-              return `<tr>
-                <td class="oid" style="font-size:10px">${p.barcode}</td>
-                <td style="font-weight:500;font-size:11px">${p.name}</td>
-                <td style="text-align:center">${p.opening}</td>
-                <td style="text-align:center;color:#2D6A4F">+${rs}</td>
-                <td style="text-align:center;color:#8E44AD">+${ret}</td>
-                <td style="text-align:center;color:#A32D2D">-${out}</td>
-                <td style="text-align:center;font-weight:700;font-size:16px;color:${rem<=0?'#A32D2D':'#854F0B'}">${rem}</td>
-                <td style="text-align:center;color:#666">${p.minStock||5}</td>
-                <td style="text-align:center;font-weight:700;color:#E67E22">${need}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`).join('');
+  downloadCSV(csv, 'out_sheet_dispatches.csv');
 }
 
-// ── REPORT ──
+// ── REPLENISHMENT REPORT ──
+function renderRepl(){
+  const brandF = document.getElementById('rp-br').value;
+  const threshold = Number(document.getElementById('rp-th').value || 5);
+  const container = document.getElementById('repl-content');
+
+  const lowStockItems = products.filter(p => {
+    if(brandF && p.brand !== brandF) return false;
+    const rem = Number(p.opening) + Number(p.restocked) + Number(p.returns) - Number(p.out);
+    return rem <= threshold;
+  });
+
+  if(!lowStockItems.length){
+    container.innerHTML = `<div class="empty">🎉 All products are well stocked above the threshold!</div>`;
+    return;
+  }
+
+  let html = `
+    <div style="margin-bottom:12px;font-size:12px;color:#666">Showing products with remaining stock below or equal to <b>${threshold}</b> items.</div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Brand</th><th>Barcode</th><th>Product</th><th>Category</th><th>Remaining</th><th>Min Alert</th><th>Status</th></tr></thead>
+        <tbody>
+  `;
+
+  lowStockItems.forEach(p => {
+    const rem = Number(p.opening) + Number(p.restocked) + Number(p.returns) - Number(p.out);
+    let cardClass = 'repl-card warn';
+    if(rem <= 0) cardClass = 'repl-card';
+    
+    html += `
+      <tr>
+        <td>${p.brand}</td>
+        <td><span class="oid">${p.barcode}</span></td>
+        <td><b>${p.name}</b></td>
+        <td>${p.category}</td>
+        <td><b style="color:${rem<=0?'#A32D2D':'#854F0B'}">${rem}</b></td>
+        <td>${p.minAlert || 5}</td>
+        <td>${rem <= 0 ? '<span class="badge b-out">Out of Stock</span>' : '<span class="badge b-low">Low Stock</span>'}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function exportReplCSV(){
+  const threshold = Number(document.getElementById('rp-th').value || 5);
+  let csv = 'Brand,Barcode,Product,Category,Remaining Stock,Threshold\n';
+  products.forEach(p => {
+    const rem = Number(p.opening) + Number(p.restocked) + Number(p.returns) - Number(p.out);
+    if(rem <= threshold){
+      csv += `"${p.brand}","${p.barcode}","${p.name}","${p.category}",${rem},${threshold}\n`;
+    }
+  });
+  downloadCSV(csv, 'replenishment_report.csv');
+}
+
+// ── DATE & ANALYTICS REPORT ──
 function renderReport(){
-  const from=document.getElementById('rf').value;
-  const to=document.getElementById('rt').value;
-  const group=document.getElementById('rg').value;
-  let list=outSheet;
-  if(from) list=list.filter(o=>o.date>=from);
-  if(to) list=list.filter(o=>o.date<=to);
-  if(!list.length){document.getElementById('rep-tb').innerHTML='<tr><td colspan="6" class="empty">No data.</td></tr>';document.getElementById('rep-sum').style.display='none';return;}
-  const total=list.reduce((s,o)=>s+o.price,0);
-  const uD=new Set(list.map(o=>o.date)).size;
-  const uO=new Set(list.map(o=>o.order)).size;
-  document.getElementById('rep-sum').style.display='block';
-  document.getElementById('rsd').textContent=uD;document.getElementById('rso').textContent=uO;
-  document.getElementById('rsi').textContent=list.length;document.getElementById('rsr').textContent=fmtPKR(total);
-  let grouped={};
-  if(group==='day'){
-    document.getElementById('rep-title').textContent='Day-wise Report';
-    document.getElementById('rep-th').innerHTML='<tr><th>Date</th><th>Orders</th><th>Items</th><th>Revenue</th><th>Top Product</th><th>Top Brand</th></tr>';
-    list.forEach(o=>{
-      if(!grouped[o.date]) grouped[o.date]={orders:new Set(),items:0,revenue:0,products:{},brands:{}};
-      grouped[o.date].orders.add(o.order);grouped[o.date].items++;grouped[o.date].revenue+=o.price;
-      grouped[o.date].products[o.name]=(grouped[o.date].products[o.name]||0)+1;
-      grouped[o.date].brands[o.brand]=(grouped[o.date].brands[o.brand]||0)+1;
+  const f = document.getElementById('rf').value;
+  const t = document.getElementById('rt').value;
+  const groupBy = document.getElementById('rg').value;
+
+  const filtered = outSheet.filter(o => {
+    if(f && o.date < f) return false;
+    if(t && o.date > t) return false;
+    return true;
+  });
+
+  const thead = document.getElementById('rep-th');
+  const tbody = document.getElementById('rep-tb');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No records found for the selected date range.</td></tr>`;
+    document.getElementById('rep-sum').style.display = 'none';
+    document.getElementById('rep-title').innerText = 'Report Result';
+    return;
+  }
+
+  let aggregated = {};
+  let totalDays = new Set();
+  let totalOrders = new Set();
+  let totalItemsCount = filtered.length;
+  let totalRevenue = 0;
+
+  filtered.forEach(o => {
+    totalDays.add(o.date);
+    totalOrders.add(o.orderNumber);
+    totalRevenue += Number(o.price);
+
+    let key = o.date;
+    if(groupBy === 'product') key = o.product;
+    else if(groupBy === 'category') key = o.category;
+    else if(groupBy === 'brand') key = o.brand;
+
+    if(!aggregated[key]) aggregated[key] = { count: 0, revenue: 0, brand: o.brand, category: o.category };
+    aggregated[key].count++;
+    aggregated[key].revenue += Number(o.price);
+  });
+
+  document.getElementById('rsd').innerText = totalDays.size;
+  document.getElementById('rso').innerText = totalOrders.size;
+  document.getElementById('rsi').innerText = totalItemsCount;
+  document.getElementById('rsr').innerText = 'Rs. ' + totalRevenue.toLocaleString();
+  document.getElementById('rep-sum').style.display = 'block';
+  document.getElementById('rep-title').innerText = `Report Grouped by ${groupBy.toUpperCase()}`;
+
+  if(groupBy === 'day'){
+    thead.innerHTML = `<tr><th>Date</th><th>Dispatched Items</th><th>Revenue</th></tr>`;
+    Object.keys(aggregated).sort().forEach(k => {
+      tbody.innerHTML += `<tr><td><b>${k}</b></td><td>${aggregated[k].count}</td><td class="price">Rs. ${aggregated[k].revenue.toLocaleString()}</td></tr>`;
     });
-    document.getElementById('rep-tb').innerHTML=Object.keys(grouped).sort().reverse().map(d=>{
-      const g=grouped[d];const tp=Object.entries(g.products).sort((a,b)=>b[1]-a[1])[0];const tb2=Object.entries(g.brands).sort((a,b)=>b[1]-a[1])[0];
-      return `<tr><td style="font-weight:600">${fmtDate(d)}</td><td style="text-align:center">${g.orders.size}</td><td style="text-align:center;font-weight:700;color:#8B0000">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="font-size:11px;color:#666">${tp?tp[0]+' ('+tp[1]+')':'-'}</td><td style="font-size:11px"><span class="brand-tag ${tb2?.[0]==='Mantashani'?'brand-m':'brand-r'}">${tb2?.[0]||'-'}</span></td></tr>`;
-    }).join('');
-  } else if(group==='product'){
-    document.getElementById('rep-title').textContent='Product-wise Report';
-    document.getElementById('rep-th').innerHTML='<tr><th>Brand</th><th>Barcode</th><th>Product</th><th>Category</th><th>Items Out</th><th>Revenue</th></tr>';
-    list.forEach(o=>{
-      if(!grouped[o.barcode]) grouped[o.barcode]={name:o.name,brand:o.brand,cat:o.cat,items:0,revenue:0};
-      grouped[o.barcode].items++;grouped[o.barcode].revenue+=o.price;
-    });
-    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([bc,g])=>`<tr><td><span class="brand-tag ${g.brand==='Mantashani'?'brand-m':'brand-r'}" style="font-size:9px">${g.brand}</span></td><td class="oid" style="font-size:10px">${bc}</td><td style="font-weight:500;font-size:11px">${g.name}</td><td style="font-size:11px;color:#666">${g.cat}</td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td></tr>`).join('');
-  } else if(group==='category'){
-    document.getElementById('rep-title').textContent='Category-wise Report';
-    document.getElementById('rep-th').innerHTML='<tr><th>Category</th><th>Items Out</th><th>Revenue</th><th>Avg Price</th><th>% Share</th></tr>';
-    list.forEach(o=>{if(!grouped[o.cat]) grouped[o.cat]={items:0,revenue:0};grouped[o.cat].items++;grouped[o.cat].revenue+=o.price;});
-    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([cat,g])=>`<tr><td style="font-weight:600">${cat}</td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="color:#666">${fmtPKR(Math.round(g.revenue/g.items))}</td><td style="font-weight:600">${Math.round(g.items/list.length*100)}%</td></tr>`).join('');
   } else {
-    document.getElementById('rep-title').textContent='Brand-wise Report';
-    document.getElementById('rep-th').innerHTML='<tr><th>Brand</th><th>Items Out</th><th>Revenue</th><th>Avg Price</th><th>% Share</th></tr>';
-    list.forEach(o=>{if(!grouped[o.brand]) grouped[o.brand]={items:0,revenue:0};grouped[o.brand].items++;grouped[o.brand].revenue+=o.price;});
-    document.getElementById('rep-tb').innerHTML=Object.entries(grouped).sort((a,b)=>b[1].items-a[1].items).map(([brand,g])=>`<tr><td><span class="brand-tag ${brand==='Mantashani'?'brand-m':'brand-r'}">${brand}</span></td><td style="text-align:center;font-weight:700;color:#8B0000;font-size:16px">${g.items}</td><td class="price">${fmtPKR(g.revenue)}</td><td style="color:#666">${fmtPKR(Math.round(g.revenue/g.items))}</td><td style="font-weight:600">${Math.round(g.items/list.length*100)}%</td></tr>`).join('');
+    thead.innerHTML = `<tr><th>${groupBy.toUpperCase()}</th><th>Brand</th><th>Category</th><th>Quantity Sold</th><th>Revenue</th></tr>`;
+    Object.keys(aggregated).forEach(k => {
+      tbody.innerHTML += `<tr><td><b>${k}</b></td><td>${aggregated[k].brand||'-'}</td><td>${aggregated[k].category||'-'}</td><td>${aggregated[k].count}</td><td class="price">Rs. ${aggregated[k].revenue.toLocaleString()}</td></tr>`;
+    });
   }
 }
 
-// ── USERS ──
-function setDefAccess(){
-  const role=document.getElementById('ur').value;
-  const def={dispatcher:['stock','scan'],csr:['stock','out'],viewer:['stock','out','report'],manager:['stock','restock','scan','return','out','repl','report','users']};
-  const acc=def[role]||[];
-  ['stock','restock','scan','return','out','repl','report'].forEach(id=>{
-    const cb=document.getElementById('ac-'+id);if(cb) cb.checked=acc.includes(id);
+function exportRepCSV(){
+  let csv = 'Grouped Metric,Quantity Sold,Revenue\n';
+  const tbodyRows = document.querySelectorAll('#rep-tb tr');
+  tbodyRows.forEach(row => {
+    const cols = row.querySelectorAll('td');
+    if(cols.length >= 2){
+      csv += `"${cols[0].innerText}","${cols[cols.length-2].innerText}","${cols[cols.length-1].innerText}"\n`;
+    }
   });
+  downloadCSV(csv, 'analytics_report.csv');
+}
+
+// ── USERS & PERMISSIONS ──
+function setDefAccess(){
+  const role = document.getElementById('ur').value;
+  const checkboxes = {
+    'ac-stock': ['manager', 'dispatcher', 'csr', 'viewer'].includes(role),
+    'ac-restock': ['manager'].includes(role),
+    'ac-scan': ['manager', 'dispatcher'].includes(role),
+    'ac-return': ['manager', 'csr', 'dispatcher'].includes(role),
+    'ac-out': ['manager', 'dispatcher', 'csr', 'viewer'].includes(role),
+    'ac-repl': ['manager'].includes(role),
+    'ac-report': ['manager'].includes(role)
+  };
+  for(let id in checkboxes){
+    document.getElementById(id).checked = checkboxes[id];
+  }
 }
 
 function addUser(){
-  const name=document.getElementById('un').value.trim();
-  const username=document.getElementById('uu').value.trim().toLowerCase();
-  const password=document.getElementById('up').value.trim();
-  const role=document.getElementById('ur').value;
-  const alertEl=document.getElementById('ua');
-  if(!name||!username||!password){alertEl.className='alert e';alertEl.textContent='Fill all fields!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
-  if(password.length<6){alertEl.className='alert e';alertEl.textContent='Password min 6 chars!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
-  if(users.find(u=>u.username===username)){alertEl.className='alert e';alertEl.textContent='Username exists!';alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);return;}
-  const access=['stock','restock','scan','return','out','repl','report'].filter(id=>document.getElementById('ac-'+id)?.checked);
-  if(role==='manager') access.push('users');
-  users.push({id:'usr'+Date.now(),name,username,password,role,access});
+  const name = document.getElementById('un').value.trim();
+  const username = document.getElementById('uu').value.trim();
+  const password = document.getElementById('up').value.trim();
+  const role = document.getElementById('ur').value;
+
+  if(!name || !username || !password){
+    showUserAlert('Please fill in all user fields.', 'e');
+    return;
+  }
+  if(users.some(u => u.username.toLowerCase() === username.toLowerCase())){
+    showUserAlert('Username already exists!', 'e');
+    return;
+  }
+
+  const access = [];
+  if(document.getElementById('ac-stock').checked) access.push('stock');
+  if(document.getElementById('ac-restock').checked) access.push('restock');
+  if(document.getElementById('ac-scan').checked) access.push('scan');
+  if(document.getElementById('ac-return').checked) access.push('return');
+  if(document.getElementById('ac-out').checked) access.push('out');
+  if(document.getElementById('ac-repl').checked) access.push('repl');
+  if(document.getElementById('ac-report').checked) access.push('report');
+
+  users.push({
+    id: 'usr_' + Date.now(),
+    name, username, password, role, access
+  });
+
   saveUsers();
-  alertEl.className='alert s';alertEl.textContent=`✅ User "${name}" added!`;alertEl.style.display='block';setTimeout(()=>alertEl.style.display='none',3000);
-  ['un','uu','up'].forEach(id=>document.getElementById(id).value='');
-  renderUsers();
+  renderUsersList();
+  showUserAlert('User added successfully!', 's');
+
+  document.getElementById('un').value = '';
+  document.getElementById('uu').value = '';
+  document.getElementById('up').value = '';
+}
+
+function renderUsersList(){
+  const container = document.getElementById('ulist');
+  container.innerHTML = '';
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'ucard';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="uavatar">${u.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="uid">${u.name} <span class="badge b-in">${u.role.toUpperCase()}</span></div>
+          <div class="uun">Username: <b>${u.username}</b> | Permissions: ${u.role==='manager'?'All Access':u.access.join(', ')}</div>
+        </div>
+      </div>
+      ${u.username !== 'manager' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
+    `;
+    container.appendChild(div);
+  });
 }
 
 function deleteUser(id){
-  if(id==='mgr001'){alert('Cannot delete default manager!');return;}
-  if(!confirm('Delete user?')) return;
-  users=users.filter(u=>u.id!==id);saveUsers();renderUsers();
+  if(!confirm('Delete this user?')) return;
+  users = users.filter(u => u.id !== id);
+  saveUsers();
+  renderUsersList();
 }
 
-function renderUsers(){
-  const rc={'manager':'#FADBD8','dispatcher':'#D5F5E3','csr':'#D6EAF8','viewer':'#F0F0F0'};
-  const tc={'manager':'#8B0000','dispatcher':'#155724','csr':'#185FA5','viewer':'#555'};
-  document.getElementById('ulist').innerHTML=users.map(u=>`
-    <div class="ucard">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="uavatar">${u.name.charAt(0)}</div>
-        <div>
-          <div class="uid">${u.name}</div>
-          <div class="uun">@${u.username}</div>
-          <div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap">
-            <span style="background:${rc[u.role]||'#F0F0F0'};color:${tc[u.role]||'#555'};padding:2px 7px;border-radius:20px;font-size:9px;font-weight:600">${u.role.toUpperCase()}</span>
-            ${(u.access||[]).filter(a=>a!=='users').map(a=>`<span style="background:#F0F0F0;color:#555;padding:2px 6px;border-radius:20px;font-size:9px">${a}</span>`).join('')}
-          </div>
-        </div>
-      </div>
-      <div>${u.id!=='mgr001'?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Remove</button>`:'<span style="font-size:11px;color:#888">Default</span>'}</div>
-    </div>`).join('');
+function showUserAlert(msg, type){
+  const el = document.getElementById('ua');
+  el.className = `alert ${type}`;
+  el.innerText = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
 }
 
 // ── AI ASSISTANT ──
 function toggleAI(){
-  const panel=document.getElementById('ai-panel');
+  const panel = document.getElementById('ai-panel');
   panel.classList.toggle('open');
-  if(panel.classList.contains('open')) document.getElementById('ai-in').focus();
 }
 
-function aiAsk(q){document.getElementById('ai-in').value=q;sendAI();}
-
-function addAIMsg(text,role){
-  const msgs=document.getElementById('ai-msgs');
-  const div=document.createElement('div');div.className='ai-msg '+role;
-  div.innerHTML=`<div class="bubble">${text}</div>`;
-  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+function aiAsk(q){
+  document.getElementById('ai-in').value = q;
+  sendAI();
 }
 
 function sendAI(){
-  const input=document.getElementById('ai-in');
-  const q=input.value.trim().toLowerCase();
-  if(!q) return;
-  addAIMsg(input.value,'user');input.value='';
+  const input = document.getElementById('ai-in');
+  const txt = input.value.trim();
+  if(!txt) return;
 
-  setTimeout(()=>{
-    const today=new Date().toLocaleDateString('en-CA');
-    let ans='';
-    if(q.includes('low stock')||q.includes('low')){
-      const low=products.filter(p=>getRem(p.barcode)<=(p.minStock||5)&&getRem(p.barcode)>0);
-      const out=products.filter(p=>getRem(p.barcode)<=0);
-      ans=`🔔 Low Stock: <b>${low.length} products</b><br>❌ Out of Stock: <b>${out.length} products</b>`;
-      if(low.length) ans+='<br><br>Low items: '+low.slice(0,5).map(p=>`${p.name} (${getRem(p.barcode)} left)`).join(', ');
-    } else if(q.includes('today')||q.includes('aaj')){
-      const todayOut=outSheet.filter(o=>o.date===today);
-      const rev=todayOut.reduce((s,o)=>s+o.price,0);
-      ans=`📊 Today's Summary:<br>Orders: <b>${new Set(todayOut.map(o=>o.order)).size}</b><br>Items Out: <b>${todayOut.length}</b><br>Revenue: <b>Rs. ${rev.toLocaleString()}</b>`;
-    } else if(q.includes('revenue')||q.includes('total')){
-      const rev=outSheet.reduce((s,o)=>s+o.price,0);
-      const mRev=outSheet.filter(o=>o.brand==='Mantashani').reduce((s,o)=>s+o.price,0);
-      const rRev=outSheet.filter(o=>o.brand==='Rici Melion').reduce((s,o)=>s+o.price,0);
-      ans=`💰 Total Revenue: <b>Rs. ${rev.toLocaleString()}</b><br>Mantashani: <b>Rs. ${mRev.toLocaleString()}</b><br>Rici Melion: <b>Rs. ${rRev.toLocaleString()}</b>`;
-    } else if(q.includes('top product')||q.includes('best')){
-      const counts={};outSheet.forEach(o=>{counts[o.name]=(counts[o.name]||0)+1;});
-      const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-      ans=sorted.length?'🏆 Top Products:<br>'+sorted.map((p,i)=>`${i+1}. ${p[0]} (${p[1]} sold)`).join('<br>'):'No data yet.';
-    } else if(q.includes('stock')||q.includes('inventory')){
-      const total=products.reduce((s,p)=>s+getRem(p.barcode),0);
-      const mStock=products.filter(p=>p.brand==='Mantashani').reduce((s,p)=>s+getRem(p.barcode),0);
-      const rStock=products.filter(p=>p.brand==='Rici Melion').reduce((s,p)=>s+getRem(p.barcode),0);
-      ans=`📦 Total Stock: <b>${total} units</b><br>Mantashani: <b>${mStock}</b><br>Rici Melion: <b>${rStock}</b>`;
-    } else if(q.includes('return')){
-      ans=`↩️ Returns: <b>${returns.length} total</b><br>Stock returned: <b>${returns.filter(r=>r.stockBack).length}</b><br>Damaged: <b>${returns.filter(r=>!r.stockBack).length}</b>`;
-    } else if(q.includes('order')){
-      const uOrders=new Set(outSheet.map(o=>o.order)).size;
-      ans=`📋 Total Orders: <b>${uOrders}</b><br>Total Items: <b>${outSheet.length}</b>`;
-    } else if(q.includes('help')||q.includes('kya')){
-      ans='💡 I can help with:<br>• Low stock / inventory status<br>• Today\'s orders & revenue<br>• Total revenue by brand<br>• Top selling products<br>• Return/exchange stats<br><br>Just ask naturally!';
-    } else {
-      ans='🤔 I didn\'t understand. Try asking:<br>• "What products are low on stock?"<br>• "How many orders today?"<br>• "Total revenue?"<br>• "Which product sold most?"';
+  appendAIMsg(txt, 'user');
+  input.value = '';
+
+  setTimeout(() => {
+    const reply = generateAIResponse(txt.toLowerCase());
+    appendAIMsg(reply, 'bot');
+  }, 400);
+}
+
+function appendAIMsg(text, sender){
+  const container = document.getElementById('ai-msgs');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${sender}`;
+  div.innerHTML = `<div class="bubble">${text}</div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function generateAIResponse(q){
+  if(q.includes('low') || q.includes('stock')){
+    let lowCount = 0;
+    products.forEach(p => {
+      const rem = Number(p.opening)+Number(p.restocked)+Number(p.returns)-Number(p.out);
+      if(rem <= (p.minAlert || 5)) lowCount++;
+    });
+    return `There are currently ${lowCount} product(s) running low or out of stock. Check the Replenishment report for details! 📦`;
+  }
+  if(q.includes('order') || q.includes('today')){
+    const todayStr = new Date().toISOString().split('T')[0];
+    let count = 0;
+    outSheet.forEach(o => { if(o.date === todayStr) count++; });
+    return `You have dispatched ${count} items today! 🚀`;
+  }
+  if(q.includes('revenue') || q.includes('sale') || q.includes('month')){
+    let rev = 0;
+    outSheet.forEach(o => rev += Number(o.price));
+    return `Total recorded revenue across all dispatches is Rs. ${rev.toLocaleString()}. 💰`;
+  }
+  if(q.includes('top') || q.includes('sold') || q.includes('product')){
+    let counts = {};
+    outSheet.forEach(o => {
+      counts[o.product] = (counts[o.product] || 0) + 1;
+    });
+    let topProd = 'None yet';
+    let max = 0;
+    for(let p in counts){
+      if(counts[p] > max){ max = counts[p]; topProd = p; }
     }
-    addAIMsg(ans,'bot');
-  },500);
+    return `The top-selling product so far is "${topProd}" with ${max} dispatches! ⭐`;
+  }
+  return "That's a great question! You can check the specific inventory, out sheets, or reports tabs for exact numbers, or let me know how else I can help you manage your stock. 😊";
 }
 
-// ── UTILS ──
-function updateStats(){
-  const total=products.reduce((s,p)=>s+getRem(p.barcode),0);
-  const today=new Date().toLocaleDateString('en-CA');
-  const rev=outSheet.reduce((s,o)=>s+o.price,0);
-  document.getElementById('st-p').textContent=products.length;
-  document.getElementById('st-s').textContent=total;
-  document.getElementById('st-o').textContent=outSheet.length;
-  document.getElementById('st-r').textContent=returns.length;
-  document.getElementById('st-t').textContent=outSheet.filter(o=>o.date===today).length;
-  document.getElementById('st-rev').textContent='Rs. '+rev.toLocaleString();
+// ── UTILITIES ──
+function showAlert(elId, msg, type){
+  const el = document.getElementById(elId);
+  el.className = `alert ${type}`;
+  el.innerText = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
 }
 
-function setDates(){
-  const today=new Date().toLocaleDateString('en-CA');
-  const m=new Date();m.setDate(1);const ms=m.toLocaleDateString('en-CA');
-  ['of','rf'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=ms;});
-  ['ot','rt'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=today;});
+function hideAlert(elId){
+  document.getElementById(elId).style.display = 'none';
 }
 
-function exportStockCSV(){
-  const h=['Brand','Barcode','Product','Category','Price','Opening','Restocked','Returns','Out','Remaining','Status'];
-  const rows=products.map(p=>{
-    const rs=restocks.filter(r=>r.barcode===p.barcode).reduce((s,r)=>s+r.qty,0);
-    const ret=returns.filter(r=>r.barcode===p.barcode&&r.stockBack).length;
-    const out=outSheet.filter(o=>o.barcode===p.barcode).length;
-    const rem=p.opening+rs+ret-out;
-    return[p.brand,p.barcode,p.name,p.cat,p.price,p.opening,rs,ret,out,rem,rem<=0?'Out':rem<=(p.minStock||5)?'Low':'OK'].map(v=>'"'+v+'"').join(',');
-  });
-  dl([h.join(','),...rows].join('\n'),'Stock.csv');
+function downloadCSV(csvString, filename){
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
-
-function exportOutCSV(){
-  const list=getFiltOut();
-  const h=['Date','Time','Order','Customer','Brand','Barcode','Product','Category','Price','By'];
-  const rows=list.map(o=>[o.date,o.time,o.order,o.customer||'',o.brand,o.barcode,o.name,o.cat,o.price,o.by||''].map(v=>'"'+v+'"').join(','));
-  dl([h.join(','),...rows].join('\n'),'Out_Sheet.csv');
-}
-
-function exportReplCSV(){
-  const th=parseInt(document.getElementById('rp-th').value)||5;
-  const brand=document.getElementById('rp-br').value;
-  const list=products.filter(p=>{if(brand&&p.brand!==brand) return false;return getRem(p.barcode)<=(p.minStock||th);});
-  const h=['Brand','Barcode','Product','Category','Remaining','Min Stock','Need'];
-  const rows=list.map(p=>{const rem=getRem(p.barcode);return[p.brand,p.barcode,p.name,p.cat,rem,p.minStock||5,Math.max(0,(p.minStock||5)*3-rem)].map(v=>'"'+v+'"').join(',');});
-  dl([h.join(','),...rows].join('\n'),'Replenishment.csv');
-}
-
-function exportRepCSV(){
-  const t=document.getElementById('rep-tbl');
-  const rows=[];t.querySelectorAll('tr').forEach(tr=>{rows.push([...tr.querySelectorAll('th,td')].map(c=>'"'+c.textContent.trim()+'"').join(','));});
-  dl(rows.join('\n'),'Report.csv');
-}
-
-function dl(csv,fn){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn;a.click();}
-
-function updateClock(){const e=document.getElementById('clock');if(e) e.textContent=new Date().toLocaleString('en-PK',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
-updateClock();setInterval(updateClock,60000);
 </script>
 </body>
 </html>
