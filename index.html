@@ -640,7 +640,21 @@ async function login(){
   }
   const u = document.getElementById('lu').value.trim().toLowerCase();
   const p = document.getElementById('lp').value.trim();
-  const user = users.find(x => String(x.username || '').toLowerCase() === u && String(x.password ?? '') === p);
+  let user = users.find(x => String(x.username || '').trim().toLowerCase() === u && String(x.password ?? '').trim() === p);
+
+  // Always keep the built-in manager login available with the requested password.
+  if(!user && u === 'manager' && p === '123456789'){
+    const idx = users.findIndex(x => String(x.username || '').trim().toLowerCase() === 'manager');
+    if(idx >= 0){
+      users[idx] = {...users[idx], ...DEFAULT_MANAGER};
+      user = users[idx];
+    } else {
+      users.unshift({...DEFAULT_MANAGER});
+      user = users[0];
+    }
+    try { await saveUsers(); } catch(e) { console.warn('Manager sync failed:', e); }
+  }
+
   if(!user){
     const err = document.getElementById('lerr');
     err.style.display = 'block';
