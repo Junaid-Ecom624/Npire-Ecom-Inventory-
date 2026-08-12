@@ -812,6 +812,98 @@ async function login(){
   if(!firebaseReady) loadFirebaseData().catch(()=>{});
 }
 
+let liveSyncBusy = false;
+let liveSyncTimer = null;
+
+async function refreshFromFirebaseEvery2Seconds(){
+  if(liveSyncBusy || !navigator.onLine || !window.db) return;
+  liveSyncBusy = true;
+
+  try{
+    // Read the latest shared Firebase state so changes made by another system
+    // appear here automatically.
+    const snap = await db.ref('/').once('value');
+    const root = snap.val() || {};
+
+    const fp = normalizeFirebaseValue(root[COLLECTIONS.products]);
+    const fo = normalizeFirebaseValue(root[COLLECTIONS.outSheet]);
+    const fr = normalizeFirebaseValue(root[COLLECTIONS.restocks]);
+    const fre = normalizeFirebaseValue(root[COLLECTIONS.returns]);
+    const fu = normalizeFirebaseValue(root[COLLECTIONS.users]);
+
+    // Only replace local data when Firebase has that collection.
+    // This keeps an empty collection from accidentally erasing local data.
+    let changed = false;
+
+    if(fp.length){
+      const next = JSON.stringify(fp);
+      if(next !== JSON.stringify(products)){ products = fp; changed = true; }
+    }
+    if(fo.length){
+      const next = JSON.stringify(fo);
+      if(next !== JSON.stringify(outSheet)){ outSheet = fo; changed = true; }
+    }
+    if(fr.length){
+      const next = JSON.stringify(fr);
+      if(next !== JSON.stringify(restocks)){ restocks = fr; changed = true; }
+    }
+    if(fre.length){
+      const next = JSON.stringify(fre);
+      if(next !== JSON.stringify(returns)){ returns = fre; changed = true; }
+    }
+    if(fu.length){
+      const next = JSON.stringify(fu);
+      if(next !== JSON.stringify(users)){ users = fu; changed = true; }
+    }
+
+    if(changed){
+      writeLocalCache();
+
+      // Keep the currently logged-in user's permissions/name current too.
+      if(currentUser){
+        const freshUser = users.find(x =>
+          String(x.username || '').toLowerCase() ===
+          String(currentUser.username || '').toLowerCase()
+        );
+        if(freshUser){
+          currentUser = freshUser;
+          saveSession(freshUser);
+          const badge = document.getElementById('ubadge');
+          if(badge) badge.innerText =
+            `${freshUser.name} (${freshUser.role.toUpperCase()})`;
+        }
+      }
+
+      // Refresh visible screens without reloading the whole page.
+      if(currentUser){
+        updateStats();
+        renderStock();
+        populateRestockSelect();
+        renderRestockHistory();
+        renderReturns();
+        renderOut();
+        renderUsersList();
+        buildTabs();
+      }
+    }
+
+    firebaseReady = true;
+    setCloudSyncStatus(true);
+  }catch(e){
+    console.warn('2-second Firebase refresh failed:', e);
+  }finally{
+    liveSyncBusy = false;
+  }
+}
+
+function startLiveFirebaseSync(){
+  if(liveSyncTimer) return;
+
+  // First sync immediately, then every 2 seconds.
+  refreshFromFirebaseEvery2Seconds();
+  liveSyncTimer = setInterval(refreshFromFirebaseEvery2Seconds, 2000);
+}
+
 function restoreSession(){
   const saved = getSavedSession();
   if(!saved) return false;
@@ -865,6 +957,10 @@ async function initApp(){
 document.addEventListener('DOMContentLoaded', () => {
   // Restore login immediately after refresh.
   restoreSession();
+
+  // Keep this system updated from Firebase every 2 seconds so changes made
+  // by another connected system become visible automatically.
+  startLiveFirebaseSync();
 
   const scanIn = document.getElementById('scan-input');
   if(scanIn){
