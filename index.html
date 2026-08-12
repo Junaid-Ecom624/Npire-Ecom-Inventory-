@@ -513,9 +513,13 @@ let currentUser = null;
 let currentSession = null;
 let firebaseReady = false;
 let firebaseLoadPromise = null;
+// Firebase Realtime Database is the ONLY persistent data source; no localStorage cache.
 let firebaseWriteQueue = Promise.resolve();
 let firebaseSyncTimer = null;
 let firebaseSyncPending = false;
+let firebaseWriteInFlight = false;
+let firebaseRealtimeStarted = false;
+let firebaseListenerRefs = [];
 let clockStarted = false;
 
 const SESSION_KEY = 'sms_session';
@@ -527,44 +531,7 @@ const CACHE_KEYS = {
   users:'sms_users'
 };
 
-function readLocalCache(){
-  try{
-    products = JSON.parse(localStorage.getItem(CACHE_KEYS.products) || '[]');
-    outSheet = JSON.parse(localStorage.getItem(CACHE_KEYS.outSheet) || '[]');
-    restocks = JSON.parse(localStorage.getItem(CACHE_KEYS.restocks) || '[]');
-    returns = JSON.parse(localStorage.getItem(CACHE_KEYS.returns) || '[]');
-    users = JSON.parse(localStorage.getItem(CACHE_KEYS.users) || '[]');
-  }catch(e){
-    console.warn('Local cache read failed:', e);
-    products=[]; outSheet=[]; restocks=[]; returns=[]; users=[];
-  }
-}
 
-function writeLocalCache(){
-  try{
-    localStorage.setItem(CACHE_KEYS.products, JSON.stringify(products));
-    localStorage.setItem(CACHE_KEYS.outSheet, JSON.stringify(outSheet));
-    localStorage.setItem(CACHE_KEYS.restocks, JSON.stringify(restocks));
-    localStorage.setItem(CACHE_KEYS.returns, JSON.stringify(returns));
-    localStorage.setItem(CACHE_KEYS.users, JSON.stringify(users));
-  }catch(e){ console.warn('Local cache write failed:', e); }
-}
-
-function saveSession(user){
-  try{
-    if(user) localStorage.setItem(SESSION_KEY, JSON.stringify({
-      id:user.id, username:user.username, name:user.name, role:user.role, access:user.access || []
-    }));
-    else localStorage.removeItem(SESSION_KEY);
-  }catch(e){ console.warn('Session storage failed:', e); }
-}
-
-function getSavedSession(){
-  try{
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
-}
 
 function setCloudSyncStatus(ok){
   const el=document.getElementById('cloudSyncStatus');
@@ -614,68 +581,61 @@ function collectionData(name, items, idGetter){
 }
 
 function queueFirebaseSync(collectionNames){
-  writeLocalCache();
-  if(!navigator.onLine) return Promise.resolve();
+  if(!navigator.onLine || !window.db) return Promise.resolve();
 
   firebaseSyncPending = true;
   clearTimeout(firebaseSyncTimer);
-  firebaseSyncTimer = setTimeout(() => flushFirebaseSync(collectionNames), 120);
 
-  return firebaseWriteQueue;
-}
+  return new Promise(resolve => {
+    firebaseSyncTimer = setTimeout(() => {
+      firebaseSyncPending = false;
+      const names = [...new Set(collectionNames || Object.values(COLLECTIONS))];
 
-function flushFirebaseSync(collectionNames){
-  const names = [...new Set(collectionNames || Object.values(COLLECTIONS))];
-  firebaseSyncPending = false;
-  setCloudSyncStatus(false);
+      // Snapshot current state at flush time.
+      const payloads = {};
+      if(names.includes(COLLECTIONS.products)){
+        payloads.products = collectionData(COLLECTIONS.products, products,
+          p => p.barcode || (p.id || (p.id = makeId('prod'))));
+      }
+      if(names.includes(COLLECTIONS.outSheet)){
+        payloads.outSheet = collectionData(COLLECTIONS.outSheet, outSheet,
+          o => o.id || (o.id = makeId('out')));
+      }
+      if(names.includes(COLLECTIONS.restocks)){
+        payloads.restocks = collectionData(COLLECTIONS.restocks, restocks,
+          r => r.id || (r.id = makeId('restock')));
+      }
+      if(names.includes(COLLECTIONS.returns)){
+        payloads.returns = collectionData(COLLECTIONS.returns, returns,
+          r => r.id || (r.id = makeId('return')));
+      }
+      if(names.includes(COLLECTIONS.users)){
+        payloads.users = collectionData(COLLECTIONS.users, users,
+          u => u.id || (u.id = makeId('usr')));
+      }
 
-  firebaseWriteQueue = firebaseWriteQueue.then(async()=>{
-    firebaseWriteInFlight = true;
-    const jobs = [];
+      firebaseWriteQueue = firebaseWriteQueue.then(async()=>{
+        firebaseWriteInFlight = true;
+        setCloudSyncStatus(false);
+        const jobs=[];
+        if('products' in payloads) jobs.push(db.ref(COLLECTIONS.products).set(payloads.products));
+        if('outSheet' in payloads) jobs.push(db.ref(COLLECTIONS.outSheet).set(payloads.outSheet));
+        if('restocks' in payloads) jobs.push(db.ref(COLLECTIONS.restocks).set(payloads.restocks));
+        if('returns' in payloads) jobs.push(db.ref(COLLECTIONS.returns).set(payloads.returns));
+        if('users' in payloads) jobs.push(db.ref(COLLECTIONS.users).set(payloads.users));
+        await Promise.all(jobs);
+        firebaseReady=true;
+        setCloudSyncStatus(true);
+      }).catch(e=>{
+        console.error('Firebase sync error:',e);
+        setCloudSyncStatus(false);
+      }).finally(()=>{
+        firebaseWriteInFlight=false;
+      });
 
-    if(names.includes(COLLECTIONS.products)){
-      jobs.push(db.ref(COLLECTIONS.products).set(
-        collectionData(COLLECTIONS.products, products,
-          p => p.barcode || (p.id || (p.id = makeId('prod'))))
-      ));
-    }
-    if(names.includes(COLLECTIONS.outSheet)){
-      jobs.push(db.ref(COLLECTIONS.outSheet).set(
-        collectionData(COLLECTIONS.outSheet, outSheet,
-          o => o.id || (o.id = makeId('out')))
-      ));
-    }
-    if(names.includes(COLLECTIONS.restocks)){
-      jobs.push(db.ref(COLLECTIONS.restocks).set(
-        collectionData(COLLECTIONS.restocks, restocks,
-          r => r.id || (r.id = makeId('restock')))
-      ));
-    }
-    if(names.includes(COLLECTIONS.returns)){
-      jobs.push(db.ref(COLLECTIONS.returns).set(
-        collectionData(COLLECTIONS.returns, returns,
-          r => r.id || (r.id = makeId('return')))
-      ));
-    }
-    if(names.includes(COLLECTIONS.users)){
-      jobs.push(db.ref(COLLECTIONS.users).set(
-        collectionData(COLLECTIONS.users, users,
-          u => u.id || (u.id = makeId('usr')))
-      ));
-    }
-
-    await Promise.all(jobs);
-    firebaseReady = true;
-    setCloudSyncStatus(true);
-  }).catch(e=>{
-    console.error('Firebase sync error:', e);
-    setCloudSyncStatus(false);
-    // Local cache remains available, so the app does not block or log out.
-  }).finally(()=>{
-    firebaseWriteInFlight = false;
+      firebaseWriteQueue.finally(resolve);
+    }, 100);
   });
-
-  return firebaseWriteQueue;
 }
 
 function save(){
@@ -696,74 +656,134 @@ async function loadFirebaseData(){
 
   firebaseLoadPromise = (async()=>{
     try{
-      // One root read is faster than five separate network reads.
       const snap = await db.ref('/').once('value');
       const root = snap.val() || {};
+      const hasAnyFirebaseNode = Object.keys(root).length > 0;
 
-      const fp = normalizeFirebaseValue(root[COLLECTIONS.products]);
-      const fo = normalizeFirebaseValue(root[COLLECTIONS.outSheet]);
-      const fr = normalizeFirebaseValue(root[COLLECTIONS.restocks]);
-      const fre = normalizeFirebaseValue(root[COLLECTIONS.returns]);
-      const fu = normalizeFirebaseValue(root[COLLECTIONS.users]);
+      // Firebase is authoritative whenever its root has data.
+      // Empty collections are valid and MUST stay empty (for example after
+      // another system deletes the last product).
+      if(hasAnyFirebaseNode){
+        products = normalizeFirebaseValue(root[COLLECTIONS.products]);
+        outSheet = normalizeFirebaseValue(root[COLLECTIONS.outSheet]);
+        restocks = normalizeFirebaseValue(root[COLLECTIONS.restocks]);
+        returns = normalizeFirebaseValue(root[COLLECTIONS.returns]);
+        users = normalizeFirebaseValue(root[COLLECTIONS.users]);
 
-      const firebaseEmpty = !fp.length && !fo.length && !fr.length && !fre.length && !fu.length;
-
-      // Firebase is authoritative when a collection exists; local cache is fallback.
-      products = fp.length ? fp : products;
-      outSheet = fo.length ? fo : outSheet;
-      restocks = fr.length ? fr : restocks;
-      returns = fre.length ? fre : returns;
-      users = fu.length ? fu : users;
-
-      if(firebaseEmpty){
+        if(!users.length){
+          users = [{...DEFAULT_MANAGER}];
+          await saveUsers();
+        }
+      }else{
+        // Only on a completely empty Firebase database do we migrate local
+        // browser data to the cloud.
         if(!users.length) users=[{...DEFAULT_MANAGER}];
-        writeLocalCache();
-        await Promise.all([
-          queueFirebaseSync([COLLECTIONS.products, COLLECTIONS.outSheet]),
-          queueFirebaseSync([COLLECTIONS.restocks]),
-          queueFirebaseSync([COLLECTIONS.returns]),
-          queueFirebaseSync([COLLECTIONS.users])
-        ]);
-      }else if(!users.some(x => String(x.username || '').toLowerCase() === 'manager')){
-        users.unshift({...DEFAULT_MANAGER});
-        writeLocalCache();
-        await saveUsers();
-      }
 
-      writeLocalCache();
+        await Promise.all([
+          save(),
+          saveRest(),
+          saveRet(),
+          saveUsers()
+        ]);
+      }
       firebaseReady=true;
       setCloudSyncStatus(true);
 
-      // Refresh the logged-in user from the cloud copy if it still exists.
       if(currentUser){
         const freshUser = users.find(x =>
-          String(x.username || '').toLowerCase() === String(currentUser.username || '').toLowerCase()
+          String(x.username || '').toLowerCase() ===
+          String(currentUser.username || '').toLowerCase()
         );
         if(freshUser){
           currentUser = freshUser;
-          saveSession(currentUser);
-          const badge=document.getElementById('ubadge');
-          if(badge) badge.innerText = `${freshUser.name} (${freshUser.role.toUpperCase()})`;
+          saveSession(freshUser);
         }
       }
 
-      console.log('Firebase Realtime Database data loaded.');
+      console.log('Firebase initial data loaded.');
+      startFirebaseRealtimeSync();
+      return true;
     }catch(e){
       firebaseReady=false;
       firebaseLoadPromise=null;
       setCloudSyncStatus(false);
-      console.error('Firebase Realtime Database load error:',e);
-      // Do NOT alert or block login. Local cache keeps the app usable.
+      console.error('Firebase initial load failed:',e);
       return false;
     }
-    return true;
   })();
 
   return firebaseLoadPromise;
 }
 
+function applyFirebaseCollection(name, value){
+  const next = normalizeFirebaseValue(value);
+  let changed = false;
+
+  if(name === COLLECTIONS.products){
+    changed = JSON.stringify(products) !== JSON.stringify(next);
+    products = next;
+  }else if(name === COLLECTIONS.outSheet){
+    changed = JSON.stringify(outSheet) !== JSON.stringify(next);
+    outSheet = next;
+  }else if(name === COLLECTIONS.restocks){
+    changed = JSON.stringify(restocks) !== JSON.stringify(next);
+    restocks = next;
+  }else if(name === COLLECTIONS.returns){
+    changed = JSON.stringify(returns) !== JSON.stringify(next);
+    returns = next;
+  }else if(name === COLLECTIONS.users){
+    changed = JSON.stringify(users) !== JSON.stringify(next);
+    users = next;
+  }
+
+  if(!changed) return;
+
+  if(currentUser && name === COLLECTIONS.users){
+    const freshUser = users.find(x =>
+      String(x.username || '').toLowerCase() ===
+      String(currentUser.username || '').toLowerCase()
+    );
+    if(freshUser){
+      currentUser = freshUser;
+      saveSession(freshUser);
+      const badge=document.getElementById('ubadge');
+      if(badge) badge.innerText =
+        `${freshUser.name} (${freshUser.role.toUpperCase()})`;
+    }
+  }
+
+  if(currentUser){
+    updateStats();
+    renderStock();
+    populateRestockSelect();
+    renderRestockHistory();
+    renderReturns();
+    renderOut();
+    renderUsersList();
+    buildTabs();
+  }
+}
+
+function startFirebaseRealtimeSync(){
+  if(firebaseRealtimeStarted) return;
+  firebaseRealtimeStarted = true;
+
+  // Real Firebase Realtime Database listeners. No polling is required.
+  Object.values(COLLECTIONS).forEach(name => {
+    const ref = db.ref(name);
+    const handler = snap => {
+      applyFirebaseCollection(name, snap.val());
+      firebaseReady = true;
+      setCloudSyncStatus(true);
+    };
+    ref.on('value', handler);
+    firebaseListenerRefs.push({ref, handler});
+  });
+
+  console.log('Firebase realtime listeners started.');
+}
+
 // Load local data immediately, then sync Firebase in the background.
-readLocalCache();
 if(!users.length) users=[{...DEFAULT_MANAGER}];
 setCloudSyncStatus(false);
 loadFirebaseData().catch(()=>{});
@@ -771,7 +791,6 @@ loadFirebaseData().catch(()=>{});
 // ── AUTH ──
 async function login(){
   // Login should be instant from the local cache; Firebase sync happens in background.
-  readLocalCache();
   if(!users.length) users=[{...DEFAULT_MANAGER}];
 
   const u = document.getElementById('lu').value.trim().toLowerCase();
@@ -790,7 +809,6 @@ async function login(){
       users.unshift({...DEFAULT_MANAGER});
       user = users[0];
     }
-    writeLocalCache();
     saveUsers();
   }
 
@@ -815,101 +833,12 @@ async function login(){
   if(!firebaseReady) loadFirebaseData().catch(()=>{});
 }
 
-let liveSyncBusy = false;
-let liveSyncTimer = null;
-
-async function refreshFromFirebaseEvery2Seconds(){
-  // Never let a local save get overwritten by an older Firebase snapshot.
-  if(liveSyncBusy || firebaseWriteInFlight || firebaseSyncPending || !navigator.onLine || !window.db) return;
-  liveSyncBusy = true;
-
-  try{
-    // Firebase is the shared source of truth. Read the latest state every 2 seconds.
-    const snap = await db.ref('/').once('value');
-    const root = snap.val() || {};
-    let changed = false;
-
-    const has = name => Object.prototype.hasOwnProperty.call(root, name);
-    const replaceIfChanged = (name, current, assign) => {
-      // An existing empty Firebase collection means ALL items were deleted.
-      if(!has(name)) return;
-      const next = normalizeFirebaseValue(root[name]);
-      if(JSON.stringify(next) !== JSON.stringify(current)){
-        assign(next);
-        changed = true;
-      }
-    };
-
-    replaceIfChanged(COLLECTIONS.products, products, v => products = v);
-    replaceIfChanged(COLLECTIONS.outSheet, outSheet, v => outSheet = v);
-    replaceIfChanged(COLLECTIONS.restocks, restocks, v => restocks = v);
-    replaceIfChanged(COLLECTIONS.returns, returns, v => returns = v);
-    replaceIfChanged(COLLECTIONS.users, users, v => users = v);
-
-    if(changed){
-      // LocalStorage is only the fast cache; update it from the newest Firebase state.
-      writeLocalCache();
-
-      if(currentUser){
-        const freshUser = users.find(x =>
-          String(x.username || '').toLowerCase() ===
-          String(currentUser.username || '').toLowerCase()
-        );
-        if(freshUser){
-          currentUser = freshUser;
-          saveSession(freshUser);
-          const badge = document.getElementById('ubadge');
-          if(badge) badge.innerText =
-            `${freshUser.name} (${freshUser.role.toUpperCase()})`;
-        }
-      }
-
-      if(currentUser){
-        updateStats();
-        renderStock();
-        populateRestockSelect();
-        renderRestockHistory();
-        renderReturns();
-        renderOut();
-        renderUsersList();
-        buildTabs();
-      }
-    }
-
-    firebaseReady = true;
-    setCloudSyncStatus(true);
-  }catch(e){
-    console.warn('2-second Firebase refresh failed:', e);
-  }finally{
-    liveSyncBusy = false;
-  }
-}
-
-function startLiveFirebaseSync(){
-  if(liveSyncTimer) return;
-
-  // First sync immediately, then every 2 seconds.
-  refreshFromFirebaseEvery2Seconds();
-  liveSyncTimer = setInterval(refreshFromFirebaseEvery2Seconds, 2000);
-}
+// Firebase realtime listeners replace 2-second polling.
+// Changes made by another system are pushed here immediately.
 
 function restoreSession(){
-  const saved = getSavedSession();
-  if(!saved) return false;
-
-  const user = users.find(x =>
-    String(x.username || '').toLowerCase() === String(saved.username || '').toLowerCase()
-  );
-
-  if(!user) return false;
-
-  currentUser = user;
-  document.getElementById('ls').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('ai-box').style.display = 'block';
-  document.getElementById('ubadge').innerText = `${user.name} (${user.role.toUpperCase()})`;
-  initApp();
-  return true;
+  // Firebase remains the only source of application data.
+  return false;
 }
 
 function logout(){
@@ -946,10 +875,10 @@ async function initApp(){
 document.addEventListener('DOMContentLoaded', () => {
   // Restore login immediately after refresh.
   restoreSession();
+  startFirebaseRealtimeSync();
 
   // Keep this system updated from Firebase every 2 seconds so changes made
   // by another connected system become visible automatically.
-  startLiveFirebaseSync();
 
   const scanIn = document.getElementById('scan-input');
   if(scanIn){
@@ -1043,8 +972,6 @@ function addProduct(){
     brand, barcode: bc, name: nm, category: cat, price: pr,
     opening: st, restocked: 0, returns: 0, out: 0, minAlert: min
   });
-
-  writeLocalCache();
   save();
   updateStats();
   renderStock();
@@ -1123,7 +1050,6 @@ function renderStock(){
 function deleteProduct(bc){
   if(!confirm('Are you sure you want to delete this product?')) return;
   products = products.filter(p => p.barcode !== bc);
-  writeLocalCache();
   save();
   updateStats();
   renderStock();
@@ -1178,8 +1104,6 @@ function restockProduct(){
     note,
     user: currentUser.name
   });
-
-  writeLocalCache();
   save();
   saveRest();
   updateStats();
@@ -1334,8 +1258,6 @@ function closeOrder(){
       user: currentUser.name
     });
   });
-
-  writeLocalCache();
   save();
   updateStats();
   renderStock();
@@ -1421,8 +1343,6 @@ function processReturn(){
     stockBack: stockBackAdded ? 'Yes (+1)' : 'No',
     user: currentUser.name
   });
-
-  writeLocalCache();
   save();
   saveRet();
   updateStats();
