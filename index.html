@@ -485,7 +485,7 @@ tr:hover td{background:#FFF9F9}
 
 <!-- FIREBASE SDKS -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAVaakMKEo7hhGxojGnfpKMgL1rSRf3Gps",
@@ -498,7 +498,7 @@ tr:hover td{background:#FFF9F9}
     measurementId: "G-S6YPSNDM3X"
   };
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const db = firebase.database();
   window.db = db;
 </script>
 
@@ -524,51 +524,66 @@ function setCloudSyncStatus(ok){
 const COLLECTIONS = { products:'products', outSheet:'outSheet', restocks:'restocks', returns:'returns', users:'users' };
 const DEFAULT_MANAGER = {id:'mgr001',name:'Junaid Ali',username:'manager',password:'123456789',role:'manager',access:['stock','restock','scan','return','out','repl','report','users']};
 function makeId(prefix){ return prefix+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
-function safeDocId(value){ return encodeURIComponent(String(value)); }
+
+function normalizeFirebaseValue(value){
+  if(!value) return [];
+  if(Array.isArray(value)) return value.filter(v => v != null);
+  return Object.keys(value).map(k => ({...(value[k] || {}), id:(value[k] && value[k].id) || k}));
+}
 
 async function readCollection(name){
-  const snap = await db.collection(name).get();
-  return snap.docs.map(d => ({...d.data(), id:d.data().id || d.id}));
+  const snap = await db.ref(name).once('value');
+  return normalizeFirebaseValue(snap.val());
 }
 
 async function syncCollection(name, items, idGetter){
-  const ref = db.collection(name);
-  const snap = await ref.get();
-  const wanted = new Set();
-  for(const item of items){
+  const data = {};
+  for(const original of items){
+    const item = {...original};
     const rawId = idGetter(item);
-    const id = safeDocId(rawId);
     item.id = rawId;
-    wanted.add(id);
-    await ref.doc(id).set(item, {merge:false});
+    // RTDB keys cannot contain . # $ [ ] /, so use a generated safe key.
+    const key = String(rawId).replace(/[.#$\[\]\/]/g, '_');
+    data[key] = item;
   }
-  const deletes = snap.docs.filter(d => !wanted.has(d.id)).map(d => d.ref.delete());
-  if(deletes.length) await Promise.all(deletes);
+  await db.ref(name).set(data);
 }
 
 async function save(){
   setCloudSyncStatus(false);
   try{
     await Promise.all([
-      syncCollection(COLLECTIONS.products, products, p => p.barcode),
+      syncCollection(COLLECTIONS.products, products, p => p.barcode || (p.id || (p.id = makeId('prod')))),
       syncCollection(COLLECTIONS.outSheet, outSheet, o => o.id || (o.id = makeId('out')))
     ]);
-  }catch(e){ console.error(e); alert('Firebase save failed: '+e.message); }
+    setCloudSyncStatus(true);
+  }catch(e){
+    console.error(e);
+    setCloudSyncStatus(false);
+    alert('Firebase save failed: '+e.message);
+    throw e;
+  }
 }
 async function saveUsers(){
   setCloudSyncStatus(false);
-  try{ await syncCollection(COLLECTIONS.users, users, u => u.id || (u.id = makeId('usr'))); }
-  catch(e){ console.error(e); alert('Firebase user save failed: '+e.message); }
+  try{
+    await syncCollection(COLLECTIONS.users, users, u => u.id || (u.id = makeId('usr')));
+    setCloudSyncStatus(true);
+  }catch(e){ console.error(e); setCloudSyncStatus(false); alert('Firebase user save failed: '+e.message); throw e; }
 }
 async function saveRest(){
   setCloudSyncStatus(false);
-  try{ await syncCollection(COLLECTIONS.restocks, restocks, r => r.id || (r.id = makeId('restock'))); }
-  catch(e){ console.error(e); alert('Firebase restock save failed: '+e.message); }
+  try{
+    await syncCollection(COLLECTIONS.restocks, restocks, r => r.id || (r.id = makeId('restock')));
+    setCloudSyncStatus(true);
+  }catch(e){ console.error(e); setCloudSyncStatus(false); alert('Firebase restock save failed: '+e.message); throw e; }
 }
 async function saveRet(){
   setCloudSyncStatus(false);
-  try{ await syncCollection(COLLECTIONS.returns, returns, r => r.id || (r.id = makeId('return'))); }
-  catch(e){ console.error(e); alert('Firebase return save failed: '+e.message); }
+  try{
+    await syncCollection(COLLECTIONS.returns, returns, r => r.id || (r.id = makeId('return')));
+    setCloudSyncStatus(true);
+  }catch(e){ console.error(e); setCloudSyncStatus(false); alert('Firebase return save failed: '+e.message); throw e; }
 }
 
 async function loadFirebaseData(){
@@ -579,23 +594,36 @@ async function loadFirebaseData(){
         readCollection(COLLECTIONS.products), readCollection(COLLECTIONS.outSheet),
         readCollection(COLLECTIONS.restocks), readCollection(COLLECTIONS.returns), readCollection(COLLECTIONS.users)
       ]);
+
       const lp=JSON.parse(localStorage.getItem('sms_prod')||'[]');
       const lo=JSON.parse(localStorage.getItem('sms_out')||'[]');
       const lr=JSON.parse(localStorage.getItem('sms_restock')||'[]');
       const lret=JSON.parse(localStorage.getItem('sms_returns')||'[]');
       const lu=JSON.parse(localStorage.getItem('sms_users')||'[]');
-      const empty=!fp.length&&!fo.length&&!fr.length&&!fre.length&&!fu.length;
-      products=fp.length?fp:lp; outSheet=fo.length?fo:lo; restocks=fr.length?fr:lr; returns=fre.length?fre:lret; users=fu.length?fu:lu;
-      if(empty){
-        if(!users.length) users=[DEFAULT_MANAGER];
+
+      const firebaseEmpty=!fp.length&&!fo.length&&!fr.length&&!fre.length&&!fu.length;
+      products=fp.length?fp:lp;
+      outSheet=fo.length?fo:lo;
+      restocks=fr.length?fr:lr;
+      returns=fre.length?fre:lret;
+      users=fu.length?fu:lu;
+
+      // First run: migrate existing browser data to Realtime Database.
+      if(firebaseEmpty){
+        if(!users.length) users=[{...DEFAULT_MANAGER}];
         await Promise.all([save(),saveRest(),saveRet(),saveUsers()]);
-      }else if(!users.length){ users=[DEFAULT_MANAGER]; await saveUsers(); }
+      }else if(!users.length){
+        users=[{...DEFAULT_MANAGER}];
+        await saveUsers();
+      }
+
       firebaseReady=true;
       setCloudSyncStatus(true);
-      console.log('Firebase data loaded.');
+      console.log('Firebase Realtime Database data loaded.');
     }catch(e){
+      firebaseReady=false;
       setCloudSyncStatus(false);
-      console.error('Firebase load error:',e);
+      console.error('Firebase Realtime Database load error:',e);
       alert('Firebase connection failed: '+e.message);
       throw e;
     }
